@@ -42,3 +42,9 @@ next-env.d.ts
 
 /test-results/
 /playwright-report/
+
+# My fit files
+/fitexample
+
+#  My notes
+vibenotesridemapclip.txt
