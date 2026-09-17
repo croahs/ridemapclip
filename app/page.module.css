@@ -54,7 +54,12 @@
 .trackCard h3 { font-size: 1rem; overflow-wrap: anywhere; }
 .trackCard p { color: #cbd5e1; line-height: 1.6; margin-top: 8px; font-size: .85rem; }
 
-.player { background: #0f172a; position: relative; }
+.player { display: flex; flex-direction: column; background: #0f172a; position: relative; }
+.player > .mapToolbar { order: 0; }
+.player > .mapWrapper { order: 1; }
+.player > .error, .player > .hint { order: 2; }
+.player > .playbackPanel { order: 3; }
+.player > .videoExport { order: 4; }
 .player:fullscreen {
   width: 100vw !important;
   height: 100vh !important;
@@ -118,6 +123,21 @@
   gap: 10px;
   pointer-events: none;
 }
+
+.mapWatermark {
+  padding: 5px 8px;
+  border: 1px solid #ffffff33;
+  border-radius: 6px;
+  background: #0f172a99;
+  color: #f8fafc;
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-shadow: 0 1px 2px #00000099;
+  pointer-events: none;
+}
+
+.player:fullscreen .mapWatermark { font-size: .9rem; padding: 7px 10px; }
 
 .fullscreenControls {
   display: flex;

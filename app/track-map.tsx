@@ -284,6 +284,7 @@ export default function TrackMap({ tracks }: { tracks: Track[] }) {
       onMouseEnter={onUserActivity}
       onClick={onUserActivity}
     >
+      <VideoExport tracks={tracks} mapTheme={mapTheme} getMap={() => mapRef.current} pausePreview={() => controls.current?.pause()} onBusy={setRendering} />
       <div className={styles.playbackPanel}>
         <div className={styles.playbackHeading}><h3>Track animation</h3><span>{CLIP_DURATION_SECONDS}-second clip</span></div>
         <div className={styles.playbackControls}>
@@ -373,7 +374,7 @@ export default function TrackMap({ tracks }: { tracks: Track[] }) {
         </div>
         <button type="button" className={styles.secondaryButton} disabled={rendering} onClick={() => {
           if (boundsRef.current) mapRef.current?.fitBounds(boundsRef.current, { padding: [35, 35], maxZoom: 16 });
-        }}>Show all tracks</button>
+        }}>Center on tracks</button>
       </div>
       <div className={styles.mapWrapper}>
         <div ref={container} className={styles.map} role="region" aria-label={`Interactive map of ${tracks.length} tracks`} />
@@ -427,11 +428,11 @@ export default function TrackMap({ tracks }: { tracks: Track[] }) {
               hasHourRides
             )}
           </div>
+          <div className={styles.mapWatermark} aria-label="ridemapclip watermark">ridemapclip.vercel.app</div>
         </div>
       </div>
       {tileError && <p className={styles.hint} role="status">Some map tiles could not load. Your track is still available; check your internet connection to see the background map.</p>}
       <p className={styles.hint}>Drag to explore. Use + and − to zoom. Playback pauses when you leave this tab. Background maps need an internet connection.</p>
-      <VideoExport tracks={tracks} mapTheme={mapTheme} getMap={() => mapRef.current} pausePreview={() => controls.current?.pause()} onBusy={setRendering} />
     </div>
   );
 }

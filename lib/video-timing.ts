@@ -4,7 +4,7 @@ export const VIDEO_WIDTH = 1920;
 export const VIDEO_HEIGHT = 1080;
 export const VIDEO_FPS = 30;
 export const VIDEO_FRAMES = CLIP_DURATION_SECONDS * VIDEO_FPS;
-export const GLOW_FADE_MS = 600;
+export const GLOW_FADE_MS = 1_000;
 export const DARK_MODE_GLOW_OPACITY = 0.5;
 
 export function videoFrameTiming(index: number) {
@@ -18,8 +18,11 @@ export function videoFrameTiming(index: number) {
 }
 
 export function riderAppearance(elapsedMs: number, finishMs: number) {
+  if (elapsedMs >= CLIP_DURATION_MS) return { visible: false, glowOpacity: 0 };
   return {
     visible: elapsedMs < finishMs,
-    glowOpacity: Math.max(0, Math.min(1, (finishMs - elapsedMs) / Math.min(GLOW_FADE_MS, finishMs))),
+    // The rider dot stops at the finish, while its glow lingers and fades for
+    // one second instead of disappearing sharply in the same frame.
+    glowOpacity: Math.max(0, Math.min(1, (finishMs + GLOW_FADE_MS - elapsedMs) / GLOW_FADE_MS)),
   };
 }
