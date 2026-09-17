@@ -1,0 +1,60 @@
+import { test, expect } from "@playwright/test";
+import path from "node:path";
+import { readFileSync } from "node:fs";
+
+test("creates, plays and downloads a 30-second MP4 after cancellation and map positioning", async ({ page }, testInfo) => {
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  await page.goto("/");
+  await page.locator('input[type="file"]').setInputFiles([
+    path.resolve("fitexample/example.fit"), path.resolve("fitexample/i171198974_520_LT1.fit"),
+  ]);
+  await page.getByRole("button", {name: "Create 2 tracks", exact: true}).click();
+  const create = page.getByRole("button", {name: "Create video", exact: true});
+  await expect(create).toBeVisible({timeout: 30000});
+  await page.locator(".leaflet-tile-loaded").first().waitFor();
+  const map = page.getByRole("region", {name: "Interactive map of 2 tracks"});
+  await map.scrollIntoViewIfNeeded();
+  const box = (await map.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down(); await page.mouse.move(box.x + box.width / 2 + 55, box.y + box.height / 2 + 20, {steps: 8}); await page.mouse.up();
+  await page.screenshot({path: testInfo.outputPath("map-before.png"), fullPage: true});
+  await create.click();
+  await expect.poll(() => page.getByRole("progressbar", {name: "Video rendering progress"}).getAttribute("value")).toMatch(/^0\.[1-9]/);
+  await page.getByRole("button", {name: "Cancel rendering"}).click();
+  await expect(create).toBeEnabled({timeout: 30000});
+  await create.click();
+  await expect(page.getByText("Your video is ready.")).toBeVisible({timeout: 180000});
+  const video = page.locator("video");
+  await expect.poll(() => video.evaluate(element => (element as HTMLVideoElement).readyState)).toBeGreaterThan(0);
+  const metadata = await video.evaluate(element => {
+    const v = element as HTMLVideoElement;
+    return {duration: v.duration, width: v.videoWidth, height: v.videoHeight};
+  });
+  expect(metadata).toEqual({duration: 30, width: 1920, height: 1080});
+  await video.evaluate(async element => { const v = element as HTMLVideoElement; v.muted = true; await v.play(); });
+  await expect.poll(() => video.evaluate(element => (element as HTMLVideoElement).currentTime)).toBeGreaterThan(.1);
+  await video.evaluate(element => { (element as HTMLVideoElement).pause(); });
+  const downloaded = page.waitForEvent("download");
+  await page.getByRole("link", {name: "Download MP4"}).click();
+  const download = await downloaded;
+  expect(download.suggestedFilename()).toBe("ridemapclip.mp4");
+  await download.saveAs(testInfo.outputPath("ridemapclip.mp4"));
+  await page.screenshot({path: testInfo.outputPath("video-ready.png"), fullPage: true});
+  expect(errors).toEqual([]);
+});
+
+test("renders a large group without dropping output frames", async ({page}, testInfo) => {
+  await page.goto("/");
+  const buffer = readFileSync(path.resolve("fitexample/example.fit"));
+  await page.locator('input[type="file"]').setInputFiles(Array.from({length: 25}, (_, index) => ({name: `rider-${index + 1}.fit`, mimeType: "application/octet-stream", buffer})));
+  await page.getByRole("button", {name: "Create 25 tracks", exact: true}).click();
+  const create = page.getByRole("button", {name: "Create video", exact: true});
+  await expect(create).toBeVisible({timeout: 30000});
+  await create.click();
+  await expect(page.getByText("Your video is ready.")).toBeVisible({timeout: 180000});
+  await expect.poll(() => page.locator("video").evaluate(element => (element as HTMLVideoElement).duration)).toBe(30);
+  const downloaded = page.waitForEvent("download");
+  await page.getByRole("link", {name: "Download MP4"}).click();
+  await (await downloaded).saveAs(testInfo.outputPath("large-group.mp4"));
+});
