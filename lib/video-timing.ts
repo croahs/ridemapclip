@@ -1,7 +1,5 @@
 import { CLIP_DURATION_MS, CLIP_DURATION_SECONDS } from "./clip";
 
-export const VIDEO_WIDTH = 1920;
-export const VIDEO_HEIGHT = 1080;
 export const VIDEO_FPS = 30;
 export const VIDEO_FRAMES = CLIP_DURATION_SECONDS * VIDEO_FPS;
 export const GLOW_FADE_MS = 1_000;

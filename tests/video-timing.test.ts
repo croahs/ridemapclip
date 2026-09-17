@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { VIDEO_FRAMES, VIDEO_FPS, videoFrameTiming, riderAppearance } from "../lib/video-timing";
+import { VIDEO_FORMATS } from "../lib/video-format";
+
+test("supported video formats have the requested aspect ratios", () => {
+  assert.deepEqual(Object.values(VIDEO_FORMATS).map(format => format.label), ["16:9", "1:1", "9:16"]);
+  assert.equal(VIDEO_FORMATS.landscape.width / VIDEO_FORMATS.landscape.height, 16 / 9);
+  assert.equal(VIDEO_FORMATS.square.width / VIDEO_FORMATS.square.height, 1);
+  assert.equal(VIDEO_FORMATS.portrait.width / VIDEO_FORMATS.portrait.height, 9 / 16);
+});
 
 test("900 contiguous frames encode exactly 30 seconds and include both endpoints", () => {
   assert.equal(VIDEO_FRAMES, 900);
