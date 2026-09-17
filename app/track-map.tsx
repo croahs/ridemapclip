@@ -14,6 +14,7 @@ import styles from "./page.module.css";
 import VideoExport from "./video-export";
 import { riderAppearance } from "@/lib/video-timing";
 import { glowOpacityMultiplier, mapTileFilter, type MapTheme } from "@/lib/map-theme";
+import { VIDEO_FORMATS, type VideoFormat } from "@/lib/video-format";
 
 type PlaybackState = "ready" | "playing" | "paused" | "finished";
 type Controls = { play: () => void; pause: () => void; replay: () => void };
@@ -21,6 +22,7 @@ type Controls = { play: () => void; pause: () => void; replay: () => void };
 export default function TrackMap({ tracks }: { tracks: Track[] }) {
   const [rendering, setRendering] = useState(false);
   const [mapTheme, setMapTheme] = useState<MapTheme>("dark");
+  const [videoFormat, setVideoFormat] = useState<VideoFormat>("landscape");
   const mapThemeRef = useRef(mapTheme);
   const player = useRef<HTMLDivElement>(null);
   const [fullscreen, setFullscreen] = useState(false);
@@ -49,6 +51,14 @@ export default function TrackMap({ tracks }: { tracks: Track[] }) {
     const tileContainer = tilesRef.current?.getContainer();
     if (tileContainer) tileContainer.style.setProperty("--map-tile-filter", mapTileFilter(mapTheme));
   }, [mapTheme]);
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      mapRef.current?.invalidateSize();
+      if (boundsRef.current) mapRef.current?.fitBounds(boundsRef.current, { padding: [35, 35], maxZoom: 16 });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [videoFormat]);
 
   const finishedCount = useMemo(() => durations.filter((d) => d > 0 && elapsed >= d).length, [durations, elapsed]);
   const activeCount = tracks.length - finishedCount;
@@ -284,7 +294,7 @@ export default function TrackMap({ tracks }: { tracks: Track[] }) {
       onMouseEnter={onUserActivity}
       onClick={onUserActivity}
     >
-      <VideoExport tracks={tracks} mapTheme={mapTheme} getMap={() => mapRef.current} pausePreview={() => controls.current?.pause()} onBusy={setRendering} />
+      <VideoExport tracks={tracks} mapTheme={mapTheme} videoFormat={videoFormat} getMap={() => mapRef.current} pausePreview={() => controls.current?.pause()} onBusy={setRendering} />
       <div className={styles.playbackPanel}>
         <div className={styles.playbackHeading}><h3>Track animation</h3><span>{CLIP_DURATION_SECONDS}-second clip</span></div>
         <div className={styles.playbackControls}>
@@ -357,26 +367,43 @@ export default function TrackMap({ tracks }: { tracks: Track[] }) {
       {fullscreenError && <p className={styles.error} role="alert">{fullscreenError}</p>}
       {tracks.some((track) => !track.movingSeconds || track.movingSeconds <= 0) && <p className={styles.hint}>Rides without a moving time use the full 30 seconds.</p>}
       <div className={styles.mapToolbar}>
-        <div className={styles.themeControl} role="group" aria-label="Map theme">
-          <span>Map</span>
-          {(["dark", "light"] as const).map((theme) => (
+        <div className={styles.mapOptions}>
+          <div className={styles.themeControl} role="group" aria-label="Map theme">
+            <span>Map</span>
+            {(["dark", "light"] as const).map((theme) => (
+              <button
+                key={theme}
+                type="button"
+                className={`${styles.secondaryButton} ${mapTheme === theme ? styles.themeButtonActive : ""}`}
+                disabled={rendering}
+                aria-pressed={mapTheme === theme}
+                onClick={() => setMapTheme(theme)}
+              >
+                {theme === "dark" ? "Dark" : "Light"}
+              </button>
+            ))}
+          </div>
+          <div className={styles.themeControl} role="group" aria-label="Video format">
+            <span>Format</span>
+            {(Object.keys(VIDEO_FORMATS) as VideoFormat[]).map((format) => (
             <button
-              key={theme}
+              key={format}
               type="button"
-              className={`${styles.secondaryButton} ${mapTheme === theme ? styles.themeButtonActive : ""}`}
+              className={`${styles.secondaryButton} ${videoFormat === format ? styles.themeButtonActive : ""}`}
               disabled={rendering}
-              aria-pressed={mapTheme === theme}
-              onClick={() => setMapTheme(theme)}
+              aria-pressed={videoFormat === format}
+              onClick={() => setVideoFormat(format)}
             >
-              {theme === "dark" ? "Dark" : "Light"}
+              {VIDEO_FORMATS[format].label}
             </button>
           ))}
+        </div>
         </div>
         <button type="button" className={styles.secondaryButton} disabled={rendering} onClick={() => {
           if (boundsRef.current) mapRef.current?.fitBounds(boundsRef.current, { padding: [35, 35], maxZoom: 16 });
         }}>Center on tracks</button>
       </div>
-      <div className={styles.mapWrapper}>
+      <div className={styles.mapWrapper} data-format={videoFormat} style={{ "--map-aspect-ratio": VIDEO_FORMATS[videoFormat].aspectRatio } as CSSProperties}>
         <div ref={container} className={styles.map} role="region" aria-label={`Interactive map of ${tracks.length} tracks`} />
         <div className={styles.mapOverlayTopLeft}>
           {fullscreen && (

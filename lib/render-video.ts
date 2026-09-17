@@ -6,14 +6,15 @@ import { getTrackColor } from "./track-colors";
 import { formatRideElapsed } from "./format";
 import type { Track } from "./track";
 import { CLIP_DURATION_MS } from "./clip";
-import { VIDEO_WIDTH, VIDEO_HEIGHT, VIDEO_FRAMES, VIDEO_FPS, videoFrameTiming, riderAppearance } from "./video-timing";
+import { VIDEO_FRAMES, VIDEO_FPS, videoFrameTiming, riderAppearance } from "./video-timing";
 import { glowOpacityMultiplier, mapTileFilter, type MapTheme } from "./map-theme";
+import { VIDEO_FORMATS, type VideoFormat } from "./video-format";
 
 type Point = [number, number];
 export type VideoProgress = { fraction: number; message: string };
 const pause = () => new Promise<void>(resolve => setTimeout(resolve, 0));
 const check = (signal: AbortSignal) => signal.throwIfAborted();
-function canvas() { const result = document.createElement("canvas"); result.width = VIDEO_WIDTH; result.height = VIDEO_HEIGHT; return result; }
+function canvas(width: number, height: number) { const result = document.createElement("canvas"); result.width = width; result.height = height; return result; }
 function context(surface: HTMLCanvasElement) {
   const result = surface.getContext("2d");
   if (!result) throw new Error("Your browser could not prepare the video canvas.");
@@ -21,7 +22,7 @@ function context(surface: HTMLCanvasElement) {
 }
 
 /** Snapshot only the already-visible map tiles; never bulk-download a map for export. */
-async function capture(map: L.Map, theme: MapTheme, signal: AbortSignal) {
+async function capture(map: L.Map, theme: MapTheme, format: VideoFormat, signal: AbortSignal) {
   map.stop();
   const mapElement = map.getContainer();
   const deadline = performance.now() + 20000;
@@ -33,13 +34,14 @@ async function capture(map: L.Map, theme: MapTheme, signal: AbortSignal) {
   check(signal);
   const rect = mapElement.getBoundingClientRect();
   if (!rect.width || !rect.height) throw new Error("Open the map before creating a video.");
-  const scale = Math.min(VIDEO_WIDTH / rect.width, VIDEO_HEIGHT / rect.height);
-  const offsetX = (VIDEO_WIDTH - rect.width * scale) / 2;
-  const offsetY = (VIDEO_HEIGHT - rect.height * scale) / 2;
-  const background = canvas();
+  const { width: videoWidth, height: videoHeight } = VIDEO_FORMATS[format];
+  const scale = Math.min(videoWidth / rect.width, videoHeight / rect.height);
+  const offsetX = (videoWidth - rect.width * scale) / 2;
+  const offsetY = (videoHeight - rect.height * scale) / 2;
+  const background = canvas(videoWidth, videoHeight);
   const ctx = context(background);
   ctx.fillStyle = "#111827";
-  ctx.fillRect(0, 0, VIDEO_WIDTH, VIDEO_HEIGHT);
+  ctx.fillRect(0, 0, videoWidth, videoHeight);
   ctx.save();
   ctx.beginPath(); ctx.rect(offsetX, offsetY, rect.width * scale, rect.height * scale); ctx.clip();
   ctx.filter = mapTileFilter(theme);
@@ -66,7 +68,7 @@ async function capture(map: L.Map, theme: MapTheme, signal: AbortSignal) {
     projected.set(point, result);
     return result;
   };
-  return { background, project, scale, offsetX, offsetY, width: rect.width * scale, height: rect.height * scale };
+  return { background, project, scale, offsetX, offsetY, width: rect.width * scale, height: rect.height * scale, videoWidth, videoHeight };
 }
 
 function stroke(ctx: CanvasRenderingContext2D, sections: Point[][], color: string, width: number, alpha = 1) {
@@ -97,17 +99,18 @@ function tail(section: Point[], length: number): Point[] {
   return result;
 }
 
-export async function renderVideo(map: L.Map, tracks: Track[], theme: MapTheme, signal: AbortSignal, progress: (value: VideoProgress) => void): Promise<Blob> {
+export async function renderVideo(map: L.Map, tracks: Track[], theme: MapTheme, format: VideoFormat, signal: AbortSignal, progress: (value: VideoProgress) => void): Promise<Blob> {
+  const { width: videoWidth, height: videoHeight } = VIDEO_FORMATS[format];
   const quality = new Quality({ bitrate: 8_000_000 });
-  if (!(await canEncodeVideo("avc", { width: VIDEO_WIDTH, height: VIDEO_HEIGHT, quality }))) {
+  if (!(await canEncodeVideo("avc", { width: videoWidth, height: videoHeight, quality }))) {
     throw new Error("This browser cannot create MP4 videos. Open the app in an up-to-date Chrome or Edge browser and try again.");
   }
   check(signal);
   progress({ fraction: 0, message: "Preparing your map…" });
-  const snapshot = await capture(map, theme, signal);
-  const surface = canvas();
+  const snapshot = await capture(map, theme, format, signal);
+  const surface = canvas(videoWidth, videoHeight);
   const ctx = context(surface);
-  const glow = canvas();
+  const glow = canvas(videoWidth, videoHeight);
   const glowCtx = context(glow);
   const large = tracks.length > 20;
   const durations = trackDurationsMs(tracks);
@@ -133,7 +136,7 @@ export async function renderVideo(map: L.Map, tracks: Track[], theme: MapTheme, 
         return { color, ...riderAppearance(timing.elapsedMs, duration), position: snapshot.project(frame.position), sections: frame.sections.map(section => section.map(snapshot.project)) };
       });
       // Glow below all lines; dots above all lines, matching the map preview.
-      glowCtx.clearRect(0, 0, VIDEO_WIDTH, VIDEO_HEIGHT);
+      glowCtx.clearRect(0, 0, videoWidth, videoHeight);
       for (const frame of frames) {
         if (!frame.glowOpacity) continue;
         for (const [length, weight, opacity] of [[64, 10, .2], [44, 8, .35], [26, 6, .6], [12, 3, .95]]) {
@@ -163,8 +166,8 @@ export async function renderVideo(map: L.Map, tracks: Track[], theme: MapTheme, 
       ctx.font = "18px Arial";
       const credit = "© OpenStreetMap contributors · openstreetmap.org/copyright";
       const creditWidth = ctx.measureText(credit).width;
-      ctx.fillStyle = "#0f172add"; ctx.fillRect(VIDEO_WIDTH - creditWidth - 28, VIDEO_HEIGHT - 38, creditWidth + 28, 38);
-      ctx.fillStyle = "white"; ctx.fillText(credit, VIDEO_WIDTH - creditWidth - 14, VIDEO_HEIGHT - 14);
+      ctx.fillStyle = "#0f172add"; ctx.fillRect(videoWidth - creditWidth - 28, videoHeight - 38, creditWidth + 28, 38);
+      ctx.fillStyle = "white"; ctx.fillText(credit, videoWidth - creditWidth - 14, videoHeight - 14);
       await source.add(timing.timestamp, timing.duration);
       progress({ fraction: (index + 1) / VIDEO_FRAMES * .98, message: `Rendering video… ${Math.round((index + 1) / VIDEO_FRAMES * 100)}%` });
       await pause();

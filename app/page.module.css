@@ -4,6 +4,12 @@
 .kicker { margin-bottom: 12px; text-transform: uppercase; letter-spacing: .12em; font-size: .75rem; color: #7dd3fc; }
 .panel h1 { font-size: clamp(2rem, 5vw, 3.25rem); line-height: 1.1; margin-bottom: 16px; }
 .subtitle { color: #cbd5e1; max-width: 650px; line-height: 1.6; margin-bottom: 28px; }
+.integrationCard { margin-bottom: 22px; padding: 18px; border: 1px solid #334155; border-radius: 14px; background: #0b1528; }
+.integrationCard h2 { font-size: 1.1rem; }
+.integrationActions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+.integrationActions .primaryButton { width: auto; margin-top: 0; padding: 10px 16px; }
+.primaryButton[aria-disabled="true"] { opacity: .5; pointer-events: none; }
+.importProgress { margin-top: 14px; color: #bae6fd; font-size: .85rem; line-height: 1.5; }
 .dropzone { display: flex; flex-direction: column; align-items: center; gap: 16px; border: 2px dashed #7dd3fc80; border-radius: 18px; padding: 28px 20px; text-align: center; background: #0e74900a; }
 .dropzone label { display: flex; flex-direction: column; gap: 8px; cursor: pointer; }
 .dropzone label strong { font-size: 1.15rem; }
@@ -29,6 +35,7 @@
 .stats dt { color: #94a3b8; font-size: .8rem; margin-bottom: 8px; }
 .stats dd { font-size: clamp(1rem, 3vw, 1.5rem); font-weight: 700; }
 .mapToolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; font-size: .85rem; }
+.mapOptions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 .mapWrapper { position: relative; width: 100%; height: 480px; border-radius: 14px; overflow: hidden; }
 .map, .mapLoading { height: 100%; width: 100%; border-radius: 14px; background: #e2e8f0; position: relative; z-index: 0; color: #0f172a; }
 .mapLoading { height: 480px; display: grid; place-items: center; }
@@ -243,5 +250,12 @@
 .rendering .mapWrapper, .rendering .playbackControls, .rendering .mapToolbar { pointer-events: none; }
 .rendering .playbackControls, .rendering .mapToolbar { opacity: .5; }
 .player:fullscreen .videoExport { display: none; }
-.mapWrapper { height: auto; aspect-ratio: 16 / 9; }
-@media (max-width: 640px) { .map { height: 100%; } }
+.mapWrapper { width: auto; height: 480px; max-width: 100%; aspect-ratio: var(--map-aspect-ratio, 16 / 9); margin-inline: auto; }
+@media (max-width: 640px) {
+  .mapWrapper { width: 100%; height: auto; aspect-ratio: var(--map-aspect-ratio, 16 / 9); }
+  .mapWrapper[data-format="portrait"] { width: auto; height: min(480px, calc(100dvh - 96px)); max-height: calc(100dvh - 96px); }
+  .map { height: 100%; }
+}
+
+.integrationActions input { flex: 1 1 220px; min-width: 0; padding: 10px 12px; border: 1px solid #475569; border-radius: 8px; color: #f8fafc; background: #0f172a; font: inherit; }
+.integrationActions input:focus-visible { outline: 2px solid #38bdf8; outline-offset: 2px; }

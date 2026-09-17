@@ -5,7 +5,8 @@ export const MAP_THEMES: readonly MapTheme[] = ["dark", "light"];
 // The light treatment begins as an inversion of the established dark map, then
 // deliberately darkens it so map detail stays secondary to the coloured trails.
 export function mapTileFilter(theme: MapTheme) {
-  const dark = "invert(1) saturate(0.25) hue-rotate(213deg) saturate(5.2) brightness(0.57)";
+  // Desaturate source-map orange/brown roads so they do not compete with ride trails.
+  const dark = "invert(1) saturate(0.25) hue-rotate(213deg) saturate(5.2) saturate(0.55) brightness(0.57)";
   return theme === "dark" ? dark : "none";
 }
 
