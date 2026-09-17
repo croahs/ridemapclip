@@ -13,6 +13,10 @@ export default function VideoExport({ tracks, mapTheme, getMap, pausePreview, on
   const [progress, setProgress] = useState<VideoProgress | null>(null);
   const [error, setError] = useState("");
   const [video, setVideo] = useState<string | null>(null);
+  const result = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (video) result.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+  }, [video]);
   const controller = useRef<AbortController | null>(null);
   const url = useRef<string | null>(null);
   useEffect(() => () => {
@@ -45,7 +49,13 @@ export default function VideoExport({ tracks, mapTheme, getMap, pausePreview, on
 
   return <section className={styles.videoExport} aria-label="Create and download video">
     <h3>Your video</h3>
-    <p className={styles.hint}>Position the map above, then create a smooth 30-second video. 1080p · 30 fps · MP4. Keep this tab open while it renders.</p>
+    {video && <div ref={result} className={styles.videoResult}>
+      <p className={styles.success}>Your video is ready.</p>
+      <video key={video} controls playsInline preload="metadata" src={video} className={styles.renderedVideo} aria-label="Rendered ride video" />
+      <a className={styles.secondaryButton} href={video} download="ridemapclip.mp4">Download MP4</a>
+      <p className={styles.hint}>This video uses the map position from when you clicked Create video. Reposition the map and create another video to change it.</p>
+    </div>}
+    <p className={styles.hint}>Position the map below, then create a smooth 30-second video. 1080p · 30 fps · MP4. Keep this tab open while it renders.</p>
     <button className={styles.primaryButton} type="button" disabled={progress !== null} onClick={createVideo}>{progress ? "Creating video…" : "Create video"}</button>
     {progress && <div>
       <p className={styles.hint} role="status">{progress.message}</p>
@@ -53,11 +63,6 @@ export default function VideoExport({ tracks, mapTheme, getMap, pausePreview, on
       <button type="button" className={styles.secondaryButton} onClick={() => controller.current?.abort()}>Cancel rendering</button>
     </div>}
     {error && <p className={styles.error} role="alert">{error}</p>}
-    {video && <div className={styles.videoResult}>
-      <p className={styles.success}>Your video is ready.</p>
-      <video key={video} controls playsInline preload="metadata" src={video} className={styles.renderedVideo} aria-label="Rendered ride video" />
-      <a className={styles.secondaryButton} href={video} download="ridemapclip.mp4">Download MP4</a>
-      <p className={styles.hint}>This video uses the map position from when you clicked Create video. Reposition the map and create another video to change it.</p>
-    </div>}
+
   </section>;
 }

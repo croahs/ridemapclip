@@ -13,10 +13,11 @@ test("900 contiguous frames encode exactly 30 seconds and include both endpoints
   assert.throws(() => videoFrameTiming(900));
 });
 
-test("each rider fades before its own finish and no dot or glow remains in the final frame", () => {
+test("each rider dot stops at its own finish while its glow fades for one second", () => {
   assert.deepEqual(riderAppearance(14000, 15000), {visible: true, glowOpacity: 1});
-  assert.deepEqual(riderAppearance(14700, 15000), {visible: true, glowOpacity: .5});
-  assert.deepEqual(riderAppearance(15000, 15000), {visible: false, glowOpacity: 0});
+  assert.deepEqual(riderAppearance(15000, 15000), {visible: false, glowOpacity: 1});
+  assert.deepEqual(riderAppearance(15500, 15000), {visible: false, glowOpacity: .5});
+  assert.deepEqual(riderAppearance(16000, 15000), {visible: false, glowOpacity: 0});
   assert.deepEqual(riderAppearance(30000, 30000), {visible: false, glowOpacity: 0});
   assert.deepEqual(riderAppearance(0, 15000), {visible: true, glowOpacity: 1});
 });

@@ -154,6 +154,12 @@ export async function renderVideo(map: L.Map, tracks: Track[], theme: MapTheme, 
       const time = formatRideElapsed(longest > 0 ? longest * timing.elapsedMs / CLIP_DURATION_MS : null, longest >= 3600);
       ctx.fillStyle = "#0f172acc"; ctx.fillRect(24, 24, ctx.measureText(time).width + 32, 52);
       ctx.fillStyle = "white"; ctx.fillText(time, 40, 61);
+      ctx.font = "bold 18px Arial";
+      const watermark = "ridemapclip.vercel.app";
+      const watermarkWidth = ctx.measureText(watermark).width;
+      const watermarkX = 40;
+      ctx.fillStyle = "#0f172a99"; ctx.fillRect(24, 88, watermarkWidth + 32, 36);
+      ctx.fillStyle = "white"; ctx.fillText(watermark, watermarkX, 112);
       ctx.font = "18px Arial";
       const credit = "© OpenStreetMap contributors · openstreetmap.org/copyright";
       const creditWidth = ctx.measureText(credit).width;
