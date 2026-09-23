@@ -38,9 +38,23 @@ export default function Home() {
   const [dragging, setDragging] = useState(false);
   // OAuth: const autoImportStarted = useRef(false);
 
-  function selectFiles(incoming: File[]) {
-    if (busy || incoming.length === 0) return;
-    const combined = [...files, ...incoming];
+  const selecting = useRef(false);
+  const [extracting, setExtracting] = useState(false);
+  const [archiveNotice, setArchiveNotice] = useState("");
+
+  async function selectFiles(incoming: File[]) {
+    if (busy || selecting.current || incoming.length === 0) return;
+    selecting.current = true;
+    setBusy(true); setExtracting(true); setArchiveNotice("");
+    try {
+    let expanded = incoming;
+    if (incoming.some(file => /\.zip$/i.test(file.name))) {
+      const { readFitInputs } = await import("@/lib/read-fit-inputs");
+      const result = await readFitInputs(incoming, files);
+      expanded = result.files;
+      if (result.ignored) setArchiveNotice("Ignored " + result.ignored + " non-FIT archive file(s).");
+    }
+    const combined = [...files, ...expanded];
     const validation = validateFitBatch(combined);
     if (validation) { setError(validation + " Your existing selection is unchanged."); return; }
     const keys = combined.map((file) => JSON.stringify([file.name, file.size, file.lastModified]));
@@ -48,6 +62,11 @@ export default function Home() {
     setFiles(combined);
     setTracks([]); setSkipped([]); setImportProgress(null);
     setError("");
+    } catch (failure) {
+      setError((failure instanceof Error ? failure.message : "The archive could not be read.") + " Your existing selection is unchanged.");
+    } finally {
+      selecting.current = false; setBusy(false); setExtracting(false);
+    }
   }
 
   async function createTracks() {
@@ -226,11 +245,11 @@ export default function Home() {
       onDragOver={(event) => { event.preventDefault(); if (!busy) setDragging(true); }}
       onDragLeave={() => setDragging(false)}
       onDrop={(event) => { event.preventDefault(); setDragging(false); selectFiles(Array.from(event.dataTransfer.files)); }}>
-      <label htmlFor="fit-file"><strong>Drop up to 200 FIT files here</strong><span>or choose recordings from your device</span></label>
-      <input id="fit-file" type="file" accept=".fit" multiple disabled={busy} aria-describedby="file-help" onChange={(event) => {
+      <label htmlFor="fit-file"><strong>Drop FIT files or ZIP archives here</strong><span>or choose recordings from your device</span></label>
+      <input id="fit-file" type="file" accept=".fit,.zip" multiple disabled={busy} aria-describedby="file-help" onChange={(event) => {
         selectFiles(Array.from(event.target.files ?? [])); event.target.value = "";
       }} />
-      <p id="file-help" className={styles.hint}>Add files together or in batches · 20 MB per file · 500 MB total · GPS required</p>
+      <p id="file-help" className={styles.hint}>Up to 200 FIT files · 20 MB per FIT · 100 MB per ZIP · 500 MB extracted total · GPS required</p>
     </div>
     <div className={styles.fileSelectionSummary}>
       <p className={styles.hint} role="status">{files.length} of {MAX_FIT_FILES} files selected{files.length > 0 ? ` (${totalFileMb} MB)` : ""}</p>
@@ -243,10 +262,12 @@ export default function Home() {
       }}>Remove</button>
     </li>)}</ul>}
     <button type="button" className={styles.primaryButton} onClick={createTracks} disabled={!files.length || busy}>
-      {busy ? (importProgress ? "Intervals.icu import in progress…" : uploadProgress ? `Reading your rides… (${uploadProgress.current} / ${uploadProgress.total})` : "Reading your rides…") : `Create ${files.length ? files.length : ""} track${files.length === 1 ? "" : "s"}`}
+      {busy ? (extracting ? "Opening your files…" : importProgress ? "Intervals.icu import in progress…" : uploadProgress ? `Reading your rides… (${uploadProgress.current} / ${uploadProgress.total})` : "Reading your rides…") : `Create ${files.length ? files.length : ""} track${files.length === 1 ? "" : "s"}`}
     </button>
     <p className={styles.hint}>Selected files are processed in your browser and are not uploaded. Adding or removing a file clears the current preview.</p>
     {busy && uploadProgress && <p role="status" className={styles.hint}>Checking recordings, validating integrity, and decoding GPS coordinates…</p>}
+    {extracting && <p role="status" className={styles.hint}>Opening files and checking archive limits…</p>}
+    {archiveNotice && <p role="status" className={styles.hint}>{archiveNotice}</p>}
     {error && <p className={styles.error} role="alert">{error}</p>}
     {skipped.length > 0 && <div role="status"><p className={styles.hint}>{importProgress ? "Intervals.icu activity skips:" : `${skipped.length} file(s) skipped because they had insufficient GPS data:`}</p><ul className={styles.warnings}>{skipped.map((message, index) => <li key={`${index}-${message}`}>{message}</li>)}</ul></div>}
 

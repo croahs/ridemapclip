@@ -12,9 +12,10 @@ import { formatDigitalTime, formatRideElapsed } from "@/lib/format";
 import styles from "./page.module.css";
 
 import VideoExport from "./video-export";
-import { riderAppearance } from "@/lib/video-timing";
+import { riderAppearance, VIDEO_FPS } from "@/lib/video-timing";
 import { glowOpacityMultiplier, mapTileFilter, type MapTheme } from "@/lib/map-theme";
 import { VIDEO_FORMATS, type VideoFormat } from "@/lib/video-format";
+import { chronologicalTrailSlices } from "@/lib/trail-order";
 
 type PlaybackState = "ready" | "playing" | "paused" | "finished";
 type Controls = { play: () => void; pause: () => void; replay: () => void };
@@ -117,6 +118,15 @@ export default function TrackMap({ tracks }: { tracks: Track[] }) {
     // Keep every rider above all route lines and trails, regardless of upload order.
     map.createPane("riders").style.zIndex = "625";
     map.createPane("riderTrails").style.zIndex = "350";
+    const chronologicalTrails = map.createPane("chronologicalTrails");
+    chronologicalTrails.style.zIndex = "400";
+    const trailCanvas = document.createElement("canvas");
+    trailCanvas.style.position = "absolute";
+    trailCanvas.style.pointerEvents = "none";
+    chronologicalTrails.appendChild(trailCanvas);
+    const preparedTrailContext = trailCanvas.getContext("2d");
+    if (!preparedTrailContext) throw new Error("Your browser could not prepare the route preview.");
+    const trailContext: CanvasRenderingContext2D = preparedTrailContext;
     const glowRenderer = L.svg({ pane: "riderTrails" });
     // White glow sits below route lines (400); rider dots stay above them (625).
     const riderRenderer = L.svg({ pane: "riders" });
@@ -141,7 +151,6 @@ export default function TrackMap({ tracks }: { tracks: Track[] }) {
       const color = getTrackColor(index, tracks.length);
       const segments = mapSegments(track.points);
       const route = createPlaybackRoute(track.points);
-      const trail = L.polyline([], { color, weight: trailWeight, opacity: 1, interactive: false }).addTo(map);
       const glowTails = [
         { length: 64, weight: 10, opacity: 0.2 },
         { length: 44, weight: 8, opacity: 0.35 },
@@ -159,7 +168,7 @@ export default function TrackMap({ tracks }: { tracks: Track[] }) {
       const rider = L.circleMarker(start, { pane: "riders", renderer: riderRenderer, radius: riderRadius, color: "#fff", weight: riderWeight, fillColor: color, fillOpacity: 1, interactive: true })
         .addTo(map).bindTooltip(`${index + 1}. ${track.name}`, { direction: "top", offset: [0, -6] });
       for (const segment of segments) bounds.extend(segment);
-      return { route, trail, rider, glowTails, durationMs: durations[index] };
+      return { route, color, trackIndex: index, rider, glowTails, durationMs: durations[index] };
     });
     boundsRef.current = bounds;
     map.fitBounds(boundsRef.current, { padding: [35, 35], maxZoom: 16 });
@@ -172,15 +181,80 @@ export default function TrackMap({ tracks }: { tracks: Track[] }) {
     });
     observer.observe(container.current);
 
+    const trailFrameMs = 1000 / VIDEO_FPS;
+    let trailElapsedMs = 0;
+
+    function prepareTrailCanvas() {
+      const size = map.getSize();
+      const ratio = window.devicePixelRatio || 1;
+      trailCanvas.width = Math.max(1, Math.round(size.x * ratio));
+      trailCanvas.height = Math.max(1, Math.round(size.y * ratio));
+      trailCanvas.style.width = `${size.x}px`;
+      trailCanvas.style.height = `${size.y}px`;
+      L.DomUtil.setPosition(trailCanvas, map.containerPointToLayerPoint([0, 0]));
+      trailContext.setTransform(ratio, 0, 0, ratio, 0, 0);
+      trailContext.lineCap = "round";
+      trailContext.lineJoin = "round";
+      trailContext.lineWidth = trailWeight;
+    }
+
+    function drawTrailInterval(fromMs: number, toMs: number) {
+      const slices = chronologicalTrailSlices(layers, fromMs, toMs);
+      for (const { color, sections } of slices) {
+        trailContext.beginPath();
+        for (const section of sections) {
+          const start = map.latLngToContainerPoint(section[0]);
+          trailContext.moveTo(start.x, start.y);
+          for (let index = 1; index < section.length; index++) {
+            const point = map.latLngToContainerPoint(section[index]);
+            trailContext.lineTo(point.x, point.y);
+          }
+        }
+        trailContext.strokeStyle = color;
+        trailContext.stroke();
+      }
+    }
+
+    function rebuildTrails() {
+      const targetMs = trailElapsedMs;
+      prepareTrailCanvas();
+      trailElapsedMs = 0;
+      while (trailElapsedMs < targetMs) {
+        const nextMs = Math.min(targetMs, trailElapsedMs + trailFrameMs);
+        drawTrailInterval(trailElapsedMs, nextMs);
+        trailElapsedMs = nextMs;
+      }
+    }
+
+    function advanceTrails(milliseconds: number) {
+      while (trailElapsedMs + trailFrameMs <= milliseconds) {
+        const nextMs = trailElapsedMs + trailFrameMs;
+        drawTrailInterval(trailElapsedMs, nextMs);
+        trailElapsedMs = nextMs;
+      }
+      if (milliseconds === CLIP_DURATION_MS && trailElapsedMs < milliseconds) {
+        drawTrailInterval(trailElapsedMs, milliseconds);
+        trailElapsedMs = milliseconds;
+      }
+    }
+
+    function clearTrails() {
+      prepareTrailCanvas();
+      trailElapsedMs = 0;
+    }
+
+    prepareTrailCanvas();
+    map.on("moveend zoomend resize", rebuildTrails);
+
     const clock = new ClipClock();
     let frameId: number | null = null;
     let running = false;
     let lastUiUpdate = -Infinity;
 
     function paint(milliseconds: number) {
-      for (const { route, trail, rider, glowTails, durationMs } of layers) {
+      advanceTrails(milliseconds);
+      for (const { route, rider, glowTails, durationMs } of layers) {
         const frame = playbackFrame(route, trackProgress(milliseconds, durationMs));
-        trail.setLatLngs(frame.sections);
         rider.setLatLng(frame.position);
         const appearance = riderAppearance(milliseconds, durationMs);
         const finished = !appearance.visible;
@@ -265,6 +339,7 @@ export default function TrackMap({ tracks }: { tracks: Track[] }) {
       replay: () => {
         pause();
         clock.reset();
+        clearTrails();
         play();
       },
     };
@@ -276,6 +351,7 @@ export default function TrackMap({ tracks }: { tracks: Track[] }) {
       running = false;
       if (frameId !== null) cancelAnimationFrame(frameId);
       document.removeEventListener("visibilitychange", onVisibility);
+      map.off("moveend zoomend resize", rebuildTrails);
       controls.current = null;
       observer.disconnect();
       tiles.off();

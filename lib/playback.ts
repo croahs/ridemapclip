@@ -9,6 +9,12 @@ export type PlaybackRoute = {
   totalDistance: number;
 };
 
+type PlaybackLocation = {
+  index: number;
+  ratio: number;
+  position: Coordinate;
+};
+
 export function createPlaybackRoute(points: TrackPoint[]): PlaybackRoute {
   if (points.length < 2) throw new Error("Playback requires at least two GPS points.");
   const coordinates: Coordinate[] = [];
@@ -31,7 +37,7 @@ export function createPlaybackRoute(points: TrackPoint[]): PlaybackRoute {
   return { coordinates, distances, totalDistance, displayIndices, breaks: points.map((point) => point.breakBefore) };
 }
 
-export function playbackFrame(route: PlaybackRoute, progress: number): { position: Coordinate; sections: Coordinate[][] } {
+function playbackLocation(route: PlaybackRoute, progress: number): PlaybackLocation {
   const fraction = Math.min(1, Math.max(0, progress));
   const last = route.coordinates.length - 1;
   let index = 0;
@@ -57,6 +63,16 @@ export function playbackFrame(route: PlaybackRoute, progress: number): { positio
   const current = route.coordinates[index];
   const next = route.coordinates[Math.min(last, index + 1)];
   const position: Coordinate = [current[0] + (next[0] - current[0]) * ratio, current[1] + (next[1] - current[1]) * ratio];
+  return { index, ratio, position };
+}
+
+function sameCoordinate(left: Coordinate, right: Coordinate) {
+  return left[0] === right[0] && left[1] === right[1];
+}
+
+export function playbackFrame(route: PlaybackRoute, progress: number): { position: Coordinate; sections: Coordinate[][] } {
+  const { index, ratio, position } = playbackLocation(route, progress);
+  const current = route.coordinates[index];
   const sections: Coordinate[][] = [];
   for (const displayIndex of route.displayIndices) {
     if (displayIndex > index) break;
@@ -68,4 +84,43 @@ export function playbackFrame(route: PlaybackRoute, progress: number): { positio
   if (section[section.length - 1] !== current) section.push(current);
   if (ratio > 0) section.push(position);
   return { position, sections };
+}
+
+/** Returns only the newly revealed route between two playback positions. */
+export function playbackSlice(route: PlaybackRoute, fromProgress: number, toProgress: number): Coordinate[][] {
+  const startFraction = Math.min(1, Math.max(0, fromProgress));
+  const endFraction = Math.min(1, Math.max(0, toProgress));
+  if (endFraction <= startFraction) return [];
+
+  const start = playbackLocation(route, startFraction);
+  const end = playbackLocation(route, endFraction);
+  const sections: Coordinate[][] = [];
+  let section: Coordinate[] = [start.position];
+
+  const finishSection = () => {
+    if (section.length > 1) sections.push(section);
+  };
+
+  let low = 0;
+  let high = route.displayIndices.length;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if (route.displayIndices[middle] <= start.index) low = middle + 1;
+    else high = middle;
+  }
+
+  for (let displayPosition = low; displayPosition < route.displayIndices.length; displayPosition++) {
+    const displayIndex = route.displayIndices[displayPosition];
+    if (displayIndex > end.index) break;
+    if (route.breaks[displayIndex]) {
+      finishSection();
+      section = [route.coordinates[displayIndex]];
+    } else {
+      section.push(route.coordinates[displayIndex]);
+    }
+  }
+
+  if (!sameCoordinate(section[section.length - 1], end.position)) section.push(end.position);
+  finishSection();
+  return sections;
 }

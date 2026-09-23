@@ -9,6 +9,7 @@ import { CLIP_DURATION_MS } from "./clip";
 import { VIDEO_FRAMES, VIDEO_FPS, videoFrameTiming, riderAppearance } from "./video-timing";
 import { glowOpacityMultiplier, mapTileFilter, type MapTheme } from "./map-theme";
 import { VIDEO_FORMATS, type VideoFormat } from "./video-format";
+import { chronologicalTrailSlices } from "./trail-order";
 
 type Point = [number, number];
 export type VideoProgress = { fraction: number; message: string };
@@ -112,14 +113,20 @@ export async function renderVideo(map: L.Map, tracks: Track[], theme: MapTheme, 
   const ctx = context(surface);
   const glow = canvas(videoWidth, videoHeight);
   const glowCtx = context(glow);
+  const trails = canvas(videoWidth, videoHeight);
+  const trailCtx = context(trails);
   const large = tracks.length > 20;
   const durations = trackDurationsMs(tracks);
   const routes = tracks.map((track, i) => {
     const route = createPlaybackRoute(track.points);
     const color = getTrackColor(i, tracks.length);
-    return { route, color, duration: durations[i] };
+    return { route, color, durationMs: durations[i] };
   });
   const longest = Math.max(0, ...tracks.map(track => track.movingSeconds ?? 0));
+  trailCtx.beginPath();
+  trailCtx.rect(snapshot.offsetX, snapshot.offsetY, snapshot.width, snapshot.height);
+  trailCtx.clip();
+  let trailElapsedMs = 0;
   const output = new Output({ format: new Mp4OutputFormat({ fastStart: "in-memory" }), target: new BufferTarget() });
   const source = new CanvasSource(surface, { codec: "avc", quality, keyFrameInterval: 2 });
   output.addVideoTrack(source, { frameRate: VIDEO_FPS });
@@ -131,10 +138,15 @@ export async function renderVideo(map: L.Map, tracks: Track[], theme: MapTheme, 
       ctx.drawImage(snapshot.background, 0, 0);
       ctx.save();
       ctx.beginPath(); ctx.rect(snapshot.offsetX, snapshot.offsetY, snapshot.width, snapshot.height); ctx.clip();
-      const frames = routes.map(({ route, color, duration }) => {
-        const frame = playbackFrame(route, trackProgress(timing.elapsedMs, duration));
-        return { color, ...riderAppearance(timing.elapsedMs, duration), position: snapshot.project(frame.position), sections: frame.sections.map(section => section.map(snapshot.project)) };
+      const frames = routes.map(({ route, color, durationMs }) => {
+        const frame = playbackFrame(route, trackProgress(timing.elapsedMs, durationMs));
+        return { color, ...riderAppearance(timing.elapsedMs, durationMs), position: snapshot.project(frame.position), sections: frame.sections.map(section => section.map(snapshot.project)) };
       });
+      const newTrails = chronologicalTrailSlices(routes, trailElapsedMs, timing.elapsedMs);
+      for (const trail of newTrails) {
+        stroke(trailCtx, trail.sections.map(section => section.map(snapshot.project)), trail.color, (large ? 1.125 : 1.875) * snapshot.scale);
+      }
+      trailElapsedMs = timing.elapsedMs;
       // Glow below all lines; dots above all lines, matching the map preview.
       glowCtx.clearRect(0, 0, videoWidth, videoHeight);
       for (const frame of frames) {
@@ -146,7 +158,7 @@ export async function renderVideo(map: L.Map, tracks: Track[], theme: MapTheme, 
       // Blur the combined glow once per frame, rather than once per rider/stroke.
       ctx.save(); ctx.filter = `blur(${1.5 * snapshot.scale}px)`; ctx.shadowColor = "white"; ctx.shadowBlur = 4 * snapshot.scale;
       ctx.drawImage(glow, 0, 0); ctx.restore();
-      for (const frame of frames) stroke(ctx, frame.sections, frame.color, (large ? 1.125 : 1.875) * snapshot.scale);
+      ctx.drawImage(trails, 0, 0);
       for (const frame of frames) {
         if (!frame.visible) continue;
         ctx.beginPath(); ctx.arc(...frame.position, (large ? 2.5 : 4) * snapshot.scale, 0, Math.PI * 2);

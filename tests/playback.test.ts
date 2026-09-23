@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { CLIP_DURATION_MS, CLIP_DURATION_SECONDS, ClipClock } from "../lib/clip";
-import { createPlaybackRoute, playbackFrame } from "../lib/playback";
+import { createPlaybackRoute, playbackFrame, playbackSlice } from "../lib/playback";
 import type { TrackPoint } from "../lib/track";
+import { chronologicalTrailSlices } from "../lib/trail-order";
 
 const point = (longitude: number, breakBefore = false): TrackPoint => ({ latitude: 0, longitude, timestamp: null, elevationMeters: null, breakBefore });
 
@@ -71,4 +72,33 @@ test("large recordings keep accurate positions with a bounded preview trail", ()
   const frame = playbackFrame(route, 1);
   assert.deepEqual(frame.position, [0, 0.199999]);
   assert.ok(frame.sections[0].length <= 6002);
+});
+
+test("playback slices contain only the newly drawn route", () => {
+  const route = createPlaybackRoute([point(0), point(0.001), point(0.01)]);
+  const first = playbackSlice(route, 0, 0.5);
+  const second = playbackSlice(route, 0.5, 1);
+  assert.deepEqual(first[0][0], [0, 0]);
+  assert.ok(Math.abs(first[0].at(-1)![1] - 0.005) < 1e-9);
+  assert.ok(Math.abs(second[0][0][1] - 0.005) < 1e-9);
+  assert.deepEqual(second[0].at(-1), [0, 0.01]);
+  assert.deepEqual(playbackSlice(route, 0.75, 0.5), []);
+});
+
+test("playback slices keep recording gaps disconnected", () => {
+  const route = createPlaybackRoute([point(0), point(1), point(10, true), point(11)]);
+  const sections = playbackSlice(route, 0.25, 0.75);
+  assert.equal(sections.length, 2);
+  assert.ok(sections[0].at(-1)![1] <= 1);
+  assert.ok(sections[1][0][1] >= 10);
+});
+
+test("new trail slices are ordered by when they were drawn", () => {
+  const route = createPlaybackRoute([point(0), point(1)]);
+  const slices = chronologicalTrailSlices([
+    { route, durationMs: 1_000 },
+    { route, durationMs: 500 },
+  ], 0, 750);
+  assert.deepEqual(slices.map(slice => slice.trackIndex), [1, 0]);
+  assert.deepEqual(slices.map(slice => slice.drawnAtMs), [500, 750]);
 });
