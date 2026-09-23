@@ -3,6 +3,7 @@ import { MAX_FIT_BYTES } from "./fit";
 import { distanceBetween, type Track, type TrackPoint } from "./track";
 
 import { movingTime } from "./moving-time";
+import type { FitWorkerResult } from "./fit-worker-types";
 
 export class FitError extends Error {}
 export class NoGpsFitError extends FitError {}
@@ -92,4 +93,14 @@ export function parseFit(buffer: ArrayBuffer, name: string): Track {
     startedAt: earliest === null ? null : new Date(earliest).toISOString(),
     endedAt: latest === null ? null : new Date(latest).toISOString(),
   };
+}
+
+/** Classifies one recording: a track, a GPS-less skip, or a named failure. */
+export function readFit(buffer: ArrayBuffer, name: string): FitWorkerResult {
+  try {
+    return { kind: "track", track: parseFit(buffer, name) };
+  } catch (error) {
+    const message = name + ": " + (error instanceof FitError ? error.message : "This recording could not be read. Please export it again.");
+    return { kind: error instanceof NoGpsFitError ? "skipped" : "error", message };
+  }
 }

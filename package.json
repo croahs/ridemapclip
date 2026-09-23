@@ -2,13 +2,19 @@
   "name": "ridemapclip",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@12.6.0",
+  "engines": {
+    "node": ">=22.13"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
-    "test:browser": "playwright test"
+    "test:browser": "playwright test",
+    "check": "pnpm typecheck && pnpm lint && pnpm test"
   },
   "dependencies": {
     "@garmin/fitsdk": "^21.214.0",

@@ -11,8 +11,6 @@ import {
   type IntervalsActivity,
   usableActivity,
 } from "@/lib/intervals";
-// OAuth session import retained for later:
-// import { getIntervalsSession, INTERVALS_SESSION_COOKIE } from "@/lib/intervals-session";
 import { FitError, NoGpsFitError, parseFit } from "@/lib/parse-fit";
 
 export const runtime = "nodejs";
@@ -79,7 +77,6 @@ function fitArrayBuffer(bytes: Uint8Array): ArrayBuffer {
 }
 
 export async function POST(request: NextRequest) {
-  // OAuth used getIntervalsSession(request.cookies.get(INTERVALS_SESSION_COOKIE)?.value).
   if (request.headers.get("origin") && request.headers.get("origin") !== request.nextUrl.origin) {
     return Response.json({ error: "Import must be started from this website." }, { status: 403 });
   }

@@ -1,14 +1,12 @@
 import { test, expect } from "@playwright/test";
-import path from "node:path";
-import { readFileSync } from "node:fs";
+import { rideFit, stubTiles } from "./fixtures";
 
 test("creates, plays and downloads a 30-second MP4 after cancellation and map positioning", async ({ page }, testInfo) => {
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
+  await stubTiles(page);
   await page.goto("/");
-  await page.locator('input[type="file"]').setInputFiles([
-    path.resolve("fitexample/example.fit"), path.resolve("fitexample/i171198974_520_LT1.fit"),
-  ]);
+  await page.locator('input[type="file"]').setInputFiles([rideFit("first.fit", 0, 600), rideFit("second.fit", 3, 900)]);
   await page.getByRole("button", {name: "Create 2 tracks", exact: true}).click();
   const create = page.getByRole("button", {name: "Create video", exact: true});
   await expect(create).toBeVisible({timeout: 30000});
@@ -45,9 +43,9 @@ test("creates, plays and downloads a 30-second MP4 after cancellation and map po
 });
 
 test("renders a large group without dropping output frames", async ({page}, testInfo) => {
+  await stubTiles(page);
   await page.goto("/");
-  const buffer = readFileSync(path.resolve("fitexample/example.fit"));
-  await page.locator('input[type="file"]').setInputFiles(Array.from({length: 25}, (_, index) => ({name: `rider-${index + 1}.fit`, mimeType: "application/octet-stream", buffer})));
+  await page.locator('input[type="file"]').setInputFiles(Array.from({length: 25}, (_, index) => rideFit(`rider-${index + 1}.fit`, index)));
   await page.getByRole("button", {name: "Create 25 tracks", exact: true}).click();
   const create = page.getByRole("button", {name: "Create video", exact: true});
   await expect(create).toBeVisible({timeout: 30000});

@@ -1,10 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Encoder, Profile, type FileIdMesg } from "@garmin/fitsdk";
-import { parseFit } from "../lib/parse-fit";
-import { MAX_FIT_BYTES, MAX_BATCH_BYTES, validateFitFile } from "../lib/fit";
+import { parseFit, readFit } from "../lib/parse-fit";
+import { MAX_FIT_BYTES, MAX_BATCH_BYTES, validateFitBatch, validateFitFile } from "../lib/fit";
 import { mapSegments } from "../lib/track";
-import { POST } from "../app/api/upload/route";
 
 const start = new Date("2026-09-15T08:00:00Z");
 const semicircles = (degrees: number) => Math.round(degrees * 2 ** 31 / 180);
@@ -22,12 +21,6 @@ function point(latitude: number, longitude: number, seconds: number) {
 }
 
 const ride = () => recording([point(48.85, 2.35, 0), point(48.851, 2.35, 10), point(48.852, 2.35, 20)]);
-
-function request(files: { data: ArrayBuffer; name: string }[]) {
-  const form = new FormData();
-  for (const file of files) form.append("files", new File([file.data], file.name));
-  return new Request("http://localhost/api/upload", { method: "POST", body: form });
-}
 
 test("decodes a binary FIT ride into accurate coordinates, meters and times", () => {
   const track = parseFit(ride(), "ride.fit");
@@ -85,88 +78,28 @@ test("dateline crossings stay local in the map and distance calculation", () => 
   assert.ok(track.distanceMeters > 220 && track.distanceMeters < 225);
 });
 
-test("upload returns a parsed track and does not cache location data", async () => {
-  const response = await POST(request([{ data: ride(), name: "ride.FIT" }]));
-  assert.equal(response.status, 200);
-  assert.equal(response.headers.get("cache-control"), "no-store");
-  assert.equal((await response.json()).tracks[0].points.length, 3);
-});
-
-test("upload rejects missing, multiple, empty, non-FIT and malformed uploads", async () => {
-  for (const files of [[], Array.from({ length: 201 }, (_, i) => ({ data: ride(), name: `ride-${i}.fit` })), [{ data: new ArrayBuffer(0), name: "empty.fit" }], [{ data: ride(), name: "ride.txt" }]]) {
-    assert.equal((await POST(request(files))).status, 400);
-  }
-  const malformed = new Request("http://localhost/api/upload", { method: "POST", headers: { "content-type": "multipart/form-data; boundary=bad" }, body: "broken" });
-  assert.equal((await POST(malformed)).status, 400);
-  assert.equal((await POST(new Request("http://localhost/api/upload", { method: "POST", body: "not multipart" }))).status, 400);
-});
-
-test("rejects oversized files and request bodies without Content-Length", async () => {
+test("batch validation rejects empty, oversized, non-FIT and too many files", () => {
+  const fit = (name: string, size = 1000) => ({ name, size });
+  assert.equal(validateFitBatch([fit("ride.FIT")]), null);
+  assert.match(validateFitBatch([])!, /between 1 and 200/);
+  assert.match(validateFitBatch(Array.from({ length: 201 }, (_, i) => fit(`ride-${i}.fit`)))!, /between 1 and 200/);
+  assert.match(validateFitBatch([fit("empty.fit", 0)])!, /empty.fit: .*empty/);
+  assert.match(validateFitBatch([fit("ride.txt")])!, /ride.txt/);
   assert.match(validateFitFile({ name: "large.fit", size: MAX_FIT_BYTES + 1 })!, /too large/);
-  const chunk = new Uint8Array(64 * 1024);
-  let enqueued = 0;
-  const body = new ReadableStream({
-    pull(controller) {
-      if (enqueued <= MAX_BATCH_BYTES + 70_000) {
-        controller.enqueue(chunk);
-        enqueued += chunk.byteLength;
-      } else {
-        controller.close();
-      }
-    },
-  });
-  const init: RequestInit & { duplex: string } = {
-    method: "POST", headers: { "content-type": "multipart/form-data; boundary=test" }, body, duplex: "half",
-  };
-  const oversized = new Request("http://localhost/api/upload", init);
-  assert.equal(oversized.headers.has("content-length"), false);
-  const response = await POST(oversized);
-  assert.equal(response.status, 400);
-  assert.match((await response.json()).error, /too large/);
+  assert.match(validateFitBatch(Array.from({ length: 30 }, (_, i) => fit(`ride-${i}.fit`, MAX_FIT_BYTES)))!, /500 MB/);
+  assert.ok(30 * MAX_FIT_BYTES > MAX_BATCH_BYTES);
 });
 
-test("five FIT files return five distinct tracks in selection order", async () => {
-  const response = await POST(request(Array.from({ length: 5 }, (_, i) => ({ data: recording([point(48 + i, 2, 0), point(48.001 + i, 2, 10)]), name: "ride-" + i + ".fit" }))));
-  assert.equal(response.status, 200);
-  const result = await response.json();
-  assert.equal(result.tracks.length, 5);
-  result.tracks.forEach((track: { name: string; points: { latitude: number }[] }, i: number) => {
-    assert.equal(track.name, "ride-" + i + ".fit");
-    assert.ok(Math.abs(track.points[0].latitude - (48 + i)) < 0.000001);
-  });
-});
-
-test("a damaged file identifies the failing filename without partial success", async () => {
-  const response = await POST(request([{ data: ride(), name: "good.fit" }, { data: new TextEncoder().encode("not a real FIT recording").buffer, name: "broken.fit" }]));
-  assert.equal(response.status, 400);
-  const result = await response.json();
-  assert.match(result.error, /broken.fit/);
-  assert.equal(result.tracks, undefined);
-});
-
-test("no-GPS and single-point files are skipped while valid rides retain their order", async () => {
-  const response = await POST(request([
-    {data: ride(), name: "first.fit"},
-    {data: recording([{timestamp: start, heartRate: 120}]), name: "indoor.fit"},
-    {data: recording([point(48, 2, 0)]), name: "single.fit"},
-    {data: ride(), name: "last.fit"},
-  ]));
-  assert.equal(response.status, 200);
-  const result = await response.json();
-  assert.equal(result.ok, true);
-  assert.deepEqual(result.tracks.map((track: {name: string}) => track.name), ["first.fit", "last.fit"]);
-  assert.equal(result.skipped.length, 2);
-  assert.match(result.skipped[0], /indoor.fit/);
-  assert.match(result.skipped[1], /single.fit/);
-});
-
-test("an entirely GPS-less chunk succeeds with an empty track list so later chunks can continue", async () => {
-  const response = await POST(request(Array.from({length: 15}, (_, i) => ({data: recording([{timestamp: start, heartRate: 120}]), name: `indoor-${i}.fit`}))));
-  const result = await response.json();
-  assert.equal(response.status, 200);
-  assert.equal(result.ok, true);
-  assert.deepEqual(result.tracks, []);
-  assert.equal(result.skipped.length, 15);
-  const next = await POST(request([{data: ride(), name: "outdoor.fit"}]));
-  assert.equal((await next.json()).tracks.length, 1);
+test("readFit returns tracks, names GPS-less skips and names damaged files", () => {
+  const good = readFit(ride(), "good.fit");
+  assert.equal(good.kind, "track");
+  assert.equal(good.kind === "track" && good.track.name, "good.fit");
+  for (const [data, name] of [[recording([{ timestamp: start, heartRate: 120 }]), "indoor.fit"], [recording([point(48, 2, 0)]), "single.fit"]] as const) {
+    const result = readFit(data, name);
+    assert.equal(result.kind, "skipped");
+    assert.match(result.kind === "skipped" ? result.message : "", new RegExp(name));
+  }
+  const broken = readFit(new TextEncoder().encode("not a real FIT recording").buffer, "broken.fit");
+  assert.equal(broken.kind, "error");
+  assert.match(broken.kind === "error" ? broken.message : "", /^broken.fit: /);
 });

@@ -4,11 +4,11 @@ Turn up to 200 outdoor FIT recordings into an interactive GPS track.
 
 ## Run locally
 
-Use Node.js 22.13 or newer in the Node 22 line (or Node 24 LTS).
+Use Node.js 22.13 or newer and pnpm (the version is pinned in `package.json`; `corepack enable` provides it).
 
-```powershell
-npm.cmd install
-npm.cmd run dev
+```bash
+pnpm install
+pnpm dev
 ```
 
 Open the local address printed by the server (normally http://localhost:3000).
@@ -35,25 +35,7 @@ return to the full track. The colored moving markers show playback position.
 
 ## Intervals.icu API-key access
 
-Users paste their personal API key from Intervals.icu Settings → Developer Settings and select Import latest 100. The key is sent in an HTTPS request body to our server, used for Basic authentication with Intervals.icu, and is not logged or persisted. The form clears immediately. Athlete ID 0 identifies the key owner, so no athlete ID is needed. No OAuth app or environment variables are required for this version.
-
-## Parked OAuth setup (future version)
-
-OAuth UI/lifecycle and configuration are commented out; routes and encrypted-session code are retained. Restore those blocks and the OAuth import authentication branch when re-enabling.
-
-
-The connection is configuration-gated. The app works without these values, but the Connect button remains disabled.
-
-1. [Register an Intervals.icu OAuth application](https://intervals.icu/oauth/apply). A new application remains pending and cannot complete OAuth until Intervals.icu approves it.
-2. Add callback URLs in the Intervals.icu app manager. For local development use `http://localhost:3000/api/intervals/callback`; production must use the same path on the deployed HTTPS origin.
-3. Copy `.env.example` to `.env.local` and supply `INTERVALS_CLIENT_ID`, `INTERVALS_CLIENT_SECRET`, `INTERVALS_REDIRECT_URI`, and a stable random `INTERVALS_SESSION_SECRET` of at least 32 characters. Add the same values as server-side environment variables in Vercel, using the production callback URL there.
-4. Restart the development server after changing environment variables.
-
-The OAuth request asks only for `ACTIVITY:READ`. The client secret and plaintext access token stay in server code. The access token is stored in an authenticated, encrypted, HttpOnly, SameSite cookie so it works across Vercel function instances; browser JavaScript and local storage cannot read it. Keep `INTERVALS_SESSION_SECRET` stable and private, because changing it disconnects existing sessions. **Disconnect** asks Intervals.icu to revoke the token and clears the cookie.
-
-After connection, RideMapClip requests the newest 100 summaries, downloads Intervals.icu-generated FIT files with at most three concurrent requests, and feeds them through the existing FIT parser. HTTP 429 responses honor `Retry-After` with bounded retries; the code does not assume a fixed quota because the app owner manages limits in the Intervals.icu dashboard. The importer streams progress and per-activity skip reasons back to the page instead of loading an athlete's whole history.
-
-Reference: [Intervals.icu OAuth](https://forum.intervals.icu/t/intervals-icu-oauth-support/2759), [API integration cookbook](https://forum.intervals.icu/t/intervals-icu-api-integration-cookbook/80090), and [API documentation](https://intervals.icu/api-docs.html).
+Users paste their personal API key from Intervals.icu Settings → Developer Settings and select Import latest 100. The key is sent in an HTTPS request body to our server, used for Basic authentication with Intervals.icu, and is not logged or persisted. The form clears immediately. Athlete ID 0 identifies the key owner, so no athlete ID is needed. No environment variables are required. An earlier OAuth implementation is preserved at the git tag `parked/oauth`.
 
 ## Animation and fixed clip duration
 
@@ -70,11 +52,13 @@ The final glow fades before each ride finishes, including inside the final 30-se
 
 ## Validation
 
-```powershell
-npm.cmd test
-npm.cmd run lint
-npm.cmd run build
+```bash
+pnpm check          # typecheck, lint, unit tests
+pnpm build
+pnpm test:browser   # after build; needs Google Chrome
 ```
+
+CI runs all three on every push to `main` and on pull requests.
 
 The tests generate binary FIT fixtures using Garmin's encoder and check coordinate
 conversion, timestamps, distance, integrity failures, missing GPS, dateline
@@ -86,14 +70,12 @@ because device exports vary.
 - `lib/parse-fit.ts`: FIT decoding and normalization.
 - `lib/track.ts`: independent track model and geometry helpers.
 - `lib/read-fit-files.ts` and `lib/fit.worker.ts`: local file processing and progress, using the shared FIT parser.
-- `app/api/upload/route.ts`: legacy server upload endpoint; the file picker no longer uses it.
-- `lib/intervals.ts` and `lib/intervals-session.ts`: bounded Intervals.icu requests and encrypted OAuth sessions.
-- `app/api/intervals/`: OAuth connection, status, revocation and streaming activity import.
+- `lib/intervals.ts` and `app/api/intervals/import/route.ts`: bounded Intervals.icu requests and streaming activity import.
 - `app/track-map.tsx`: client-only map, markers, and cleanup.
 - `app/page.tsx`: multi-file workflow.
 
 The background map is for interactive local previews. Review the tile provider
 and its usage terms before public deployment or automated video rendering.
 
-Browser export tests: run npm.cmd run build, then npm.cmd run test:browser (Microsoft Edge required). These exercise map positioning, mid-render cancellation, MP4 playback/download and a large group export.
+Browser tests use synthetic FIT rides and stubbed map tiles, so they need no personal files or network. They cover local import, validation, map positioning, mid-render cancellation, MP4 playback/download and a large group export.
 

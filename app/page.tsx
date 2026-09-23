@@ -11,19 +11,7 @@ import styles from "./page.module.css";
 
 const TrackMap = dynamic(() => import("./track-map"), { ssr: false, loading: () => <p className={styles.mapLoading} role="status">Loading your map…</p> });
 
-// OAuth status type retained for later.
-// type IntervalsStatus = { configured: boolean; connected: boolean; athleteName: string | null };
 type ImportProgress = { completed: number; total: number; imported: number; skipped: number };
-
-/* OAuth error mapping retained for later.
-const oauthErrors: Record<string, string> = {
-  access_denied: "Intervals.icu access was not granted.",
-  invalid_state: "The Intervals.icu connection expired or could not be verified. Please try again.",
-  token_exchange_failed: "Intervals.icu could not finish the connection. Please try again.",
-  not_configured: "Intervals.icu is not configured on this server.",
-  authorization_failed: "Intervals.icu authorization failed. Please try again.",
-};
-*/
 
 export default function Home() {
   const [files, setFiles] = useState<File[]>([]);
@@ -34,9 +22,7 @@ export default function Home() {
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
   const [importProgress, setImportProgress] = useState<ImportProgress | null>(null);
   const [apiKey, setApiKey] = useState("");
-  // OAuth: const [intervals, setIntervals] = useState<IntervalsStatus | null>(null);
   const [dragging, setDragging] = useState(false);
-  // OAuth: const autoImportStarted = useRef(false);
 
   const selecting = useRef(false);
   const [extracting, setExtracting] = useState(false);
@@ -144,47 +130,6 @@ export default function Home() {
     }
   }
 
-  /* OAuth connection lifecycle retained for later; API keys are used per import.
-  async function disconnectIntervals() {
-    if (busy) return;
-    setBusy(true); setError("");
-    try {
-      const response = await fetch("/api/intervals/disconnect", { method: "POST" });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Intervals.icu could not be disconnected.");
-      setIntervals(current => ({ configured: current?.configured ?? true, connected: false, athleteName: null }));
-      if (result.warning) setError(result.warning);
-    } catch (failure) {
-      setError(failure instanceof Error ? failure.message : "Intervals.icu could not be disconnected.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  useEffect(() => {
-    void (async () => {
-      const params = new URLSearchParams(window.location.search);
-      const oauthError = params.get("intervals_error");
-      if (oauthError) setError(oauthErrors[oauthError] ?? "Intervals.icu authorization failed.");
-      if (params.has("intervals") || oauthError) window.history.replaceState({}, "", window.location.pathname);
-      try {
-        const response = await fetch("/api/intervals/status", { cache: "no-store" });
-        const status = await response.json() as IntervalsStatus;
-        setIntervals(status);
-        if (status.connected && !autoImportStarted.current) {
-          autoImportStarted.current = true;
-          await importIntervals();
-        }
-      } catch {
-        setIntervals({ configured: false, connected: false, athleteName: null });
-      }
-    })();
-    // The initial status check intentionally runs once per page load.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  */
-
   const latestStep = useRef<HTMLElement>(null);
   useEffect(() => {
     if (tracks.length) latestStep.current?.scrollIntoView({ block: "start", behavior: "smooth" });
@@ -219,28 +164,7 @@ export default function Home() {
         <input id="intervals-api-key" type="password" value={apiKey} onChange={event => setApiKey(event.target.value)} autoComplete="off" spellCheck={false} maxLength={256} required disabled={busy} aria-describedby="api-key-help" />
         <button type="submit" className={styles.primaryButton} disabled={busy || !apiKey.trim()}>{importProgress ? "Importing activities…" : "Import latest 100"}</button>
       </form>
-      {/* OAuth connection UI retained below for a future release.
-    <section className={styles.integrationCard} aria-labelledby="intervals-title">
-      <div>
-        <h2 id="intervals-title">Intervals.icu</h2>
-        <p className={styles.hint}>{intervals?.connected
-          ? `Connected as ${intervals.athleteName}. Your latest 100 activities import automatically.`
-          : intervals?.configured
-            ? "Connect with read-only activity access. No ride picker is needed."
-            : intervals === null ? "Checking connection…" : "Add the Intervals.icu server settings to enable this connection."}</p>
-      </div>
-      <div className={styles.integrationActions}>
-        {intervals?.connected ? <>
-          <button type="button" className={styles.primaryButton} disabled={busy} onClick={importIntervals}>Refresh latest 100</button>
-          <button type="button" className={styles.secondaryButton} disabled={busy} onClick={disconnectIntervals}>Disconnect</button>
-        </> : intervals?.configured
-          ? <a className={styles.primaryButton} href="/api/intervals/connect" aria-disabled={busy}>Connect Intervals.icu</a>
-          : <button type="button" className={styles.primaryButton} disabled>Connect Intervals.icu</button>}
-      </div>
       {importProgress && <p className={styles.importProgress} role="status">{busy ? "Importing" : "Imported"} {importProgress.completed} of {importProgress.total} available activities · {importProgress.imported} tracks · {importProgress.skipped} skipped</p>}
-    </section>
-   
-      */}
     </section> <div className={`${styles.dropzone} ${dragging ? styles.dragging : ""}`}
       onDragOver={(event) => { event.preventDefault(); if (!busy) setDragging(true); }}
       onDragLeave={() => setDragging(false)}
