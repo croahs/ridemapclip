@@ -11,7 +11,7 @@ pnpm install
 pnpm dev
 ```
 
-Open the local address printed by the server (normally http://localhost:3000).
+Open the local address Vite prints (normally http://localhost:5173).
 Choose one to 200 `.fit` files, then select **Create tracks**. Add files in one batch or separately; remove individual files from the selection before creating tracks. You can pan, zoom, and
 return to the full track. The colored moving markers show playback position.
 
@@ -28,14 +28,14 @@ return to the full track. The colored moving markers show playback position.
 - Missing GPS samples, time going backwards, and intervals over two minutes
   split the line so it does not imply a route across missing data.
 - Indoor/no-GPS recordings are skipped. Damaged, empty, and stationary recordings produce clear errors.
-- Local files are decoded sequentially in a browser Web Worker, not uploaded or persisted. This avoids Vercel request/response size limits and keeps decoding off the main UI thread. Reloading clears the track.
+- Local files are decoded sequentially in a browser Web Worker, not uploaded or persisted. Decoding runs off the main UI thread. Reloading clears the track.
 - Map tiles need internet access and are requested directly from OpenStreetMap;
   the full FIT file is not sent to the tile provider.
 - Intervals.icu can import the latest 100 activities with read-only access. Activities without GPS and unavailable Strava-only stubs are skipped and explained; there is no ride picker.
 
 ## Intervals.icu API-key access
 
-Users paste their personal API key from Intervals.icu Settings → Developer Settings and select Import latest 100. The key is sent in an HTTPS request body to our server, used for Basic authentication with Intervals.icu, and is not logged or persisted. The form clears immediately. Athlete ID 0 identifies the key owner, so no athlete ID is needed. No environment variables are required. An earlier OAuth implementation is preserved at the git tag `parked/oauth`.
+Users paste their personal API key from Intervals.icu Settings → Developer Settings and select Import latest 100. The browser calls the Intervals.icu API directly with Basic authentication; the key never reaches a RideMapClip server (there is none) and is not persisted. The form clears immediately. Athlete ID 0 identifies the key owner, so no athlete ID is needed. No environment variables are required. An earlier OAuth implementation is preserved at the git tag `parked/oauth`.
 
 ## Animation and fixed clip duration
 
@@ -70,9 +70,9 @@ because device exports vary.
 - `lib/parse-fit.ts`: FIT decoding and normalization.
 - `lib/track.ts`: independent track model and geometry helpers.
 - `lib/read-fit-files.ts` and `lib/fit.worker.ts`: local file processing and progress, using the shared FIT parser.
-- `lib/intervals.ts` and `app/api/intervals/import/route.ts`: bounded Intervals.icu requests and streaming activity import.
+- `lib/intervals.ts`: bounded Intervals.icu requests and activity import, run in the browser.
 - `app/track-map.tsx`: client-only map, markers, and cleanup.
-- `app/page.tsx`: multi-file workflow.
+- `app/app.tsx`: multi-file workflow; `app/main.tsx` and `index.html` are the entry points.
 
 The background map is for interactive local previews. Review the tile provider
 and its usage terms before public deployment or automated video rendering.

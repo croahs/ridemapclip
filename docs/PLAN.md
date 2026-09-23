@@ -12,9 +12,6 @@ Peder made after AGENTS.md was written (notably the clip-duration rule).
 
 | Topic | Decision |
 |---|---|
-| Backend | Remove it. Intervals.icu import runs in the browser; the app is a static site. |
-| Framework | Migrate Next.js → Vite + React (static build, still hosted on Vercel). |
-| Package manager | pnpm. Remove `package-lock.json`. |
 | Clip duration | User picks 15–120 s. Replaces the fixed 30-second rule. |
 
 ## Done
@@ -23,25 +20,9 @@ Peder made after AGENTS.md was written (notably the clip-duration rule).
 - Phase 1: pnpm, `.gitattributes`, dead code removed (OAuth at tag `parked/oauth`,
   upload route, Copilot file, fonts, template SVGs, unused CSS), `pnpm check`,
   CI, hermetic browser tests (synthetic FIT, stubbed tiles, Chrome).
-
-## Phase 2 — static app
-
-1. Move the Intervals.icu import into the browser. CORS was verified on
-   2026-09-23: both `/api/v1/athlete/0/activities` and
-   `/api/v1/activity/{id}/fit-file` answer preflights with
-   `Access-Control-Allow-Origin` echoing the origin and allowing
-   `authorization`. Keep existing behaviour: 100 latest, concurrency 3,
-   `Retry-After` handling, size limits, Strava-stub skips. Decode gzip with
-   `DecompressionStream("gzip")`; parse FIT in the existing worker. The key
-   goes only to Intervals.icu; update the UI copy to say so.
-2. Delete `app/api/` entirely, then migrate to Vite + React:
-   `index.html` holds title/OpenGraph metadata, workers keep
-   `new URL(..., import.meta.url)`, remove `next`, `eslint-config-next`,
-   `next-env.d.ts` and the Next.js block in AGENTS.md. Vercel project
-   settings (framework preset/output dir) need updating — unknown what they
-   are today; check before deploying.
-- Verify on the rendered page (local build preview) and on the Vercel deploy:
-  local FIT, ZIP, Intervals import, playback, video export.
+- Phase 2: Intervals.icu import runs in the browser (`importLatestActivities`),
+  `app/api/` deleted, Next.js replaced by Vite (`vercel.json` sets the
+  framework). Live import with a real key is still unverified.
 
 ## Phase 3 — renderer and performance
 

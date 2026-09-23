@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -9,7 +7,7 @@ import { createPlaybackRoute, playbackFrame } from "@/lib/playback";
 import { getTrackColor } from "@/lib/track-colors";
 import { trackDurationsMs, trackProgress, currentTrackElapsedSeconds } from "@/lib/clip-timing";
 import { formatDigitalTime, formatRideElapsed } from "@/lib/format";
-import styles from "./page.module.css";
+import styles from "./app.module.css";
 
 import VideoExport from "./video-export";
 import { riderAppearance, VIDEO_FPS } from "@/lib/video-timing";

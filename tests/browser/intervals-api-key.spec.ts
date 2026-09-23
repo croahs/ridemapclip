@@ -1,18 +1,23 @@
 import { test, expect } from "@playwright/test";
 
-test("API-key form works without OAuth configuration and clears the key on import", async ({ page }) => {
-  let requests = 0;
-  await page.route("**/api/intervals/import", async route => {
-    requests++;
-    expect(route.request().postDataJSON()).toEqual({ apiKey: "test-key" });
-    await route.fulfill({ contentType: "application/x-ndjson", body: JSON.stringify({ type: "fatal", message: "Intervals.icu rejected this API key." }) + "\n" });
+test("API key goes only to Intervals.icu, is cleared from the form and never stored", async ({ page }) => {
+  const intervals: string[] = [];
+  const ownOrigin: string[] = [];
+  page.on("request", request => {
+    const url = new URL(request.url());
+    if (url.origin === new URL(page.url() || "http://127.0.0.1").origin && request.method() !== "GET") ownOrigin.push(request.url());
+  });
+  await page.route("https://intervals.icu/api/**", async route => {
+    intervals.push(route.request().url());
+    expect(await route.request().headerValue("authorization")).toBe("Basic " + Buffer.from("API_KEY:test-key").toString("base64"));
+    await route.fulfill({ status: 401, headers: { "access-control-allow-origin": "*" } });
   });
   await page.goto("/");
-  await expect(page.getByRole("link", { name: "Connect Intervals.icu", exact: true })).toHaveCount(0);
   await page.getByLabel("API key", { exact: true }).fill("test-key");
   await page.getByRole("button", { name: "Import latest 100", exact: true }).click();
   await expect(page.getByLabel("API key", { exact: true })).toHaveValue("");
   await expect(page.locator('p[role="alert"]')).toContainText("rejected this API key");
-  expect(requests).toBe(1);
+  expect(intervals).toHaveLength(1);
+  expect(ownOrigin).toEqual([]);
   expect(await page.evaluate(() => JSON.stringify([localStorage, sessionStorage]))).not.toContain("test-key");
 });

@@ -1,19 +1,15 @@
-"use client";
-
-import { useEffect, useRef, useState, type CSSProperties } from "react";
-import dynamic from "next/dynamic";
+import { lazy, Suspense, useEffect, useRef, useState, type CSSProperties } from "react";
 import { MAX_FIT_FILES, validateFitBatch } from "@/lib/fit";
 import { getTrackColor } from "@/lib/track-colors";
 import { trackDurationsMs } from "@/lib/clip-timing";
 import { formatHumanDuration } from "@/lib/format";
 import type { Track } from "@/lib/track";
-import styles from "./page.module.css";
+import type { ImportProgress } from "@/lib/intervals";
+import styles from "./app.module.css";
 
-const TrackMap = dynamic(() => import("./track-map"), { ssr: false, loading: () => <p className={styles.mapLoading} role="status">Loading your map…</p> });
+const TrackMap = lazy(() => import("./track-map"));
 
-type ImportProgress = { completed: number; total: number; imported: number; skipped: number };
-
-export default function Home() {
+export default function App() {
   const [files, setFiles] = useState<File[]>([]);
   const [tracks, setTracks] = useState<Track[]>([]);
   const [skipped, setSkipped] = useState<string[]>([]);
@@ -83,49 +79,18 @@ export default function Home() {
     setApiKey("");
     setImportProgress({ completed: 0, total: 0, imported: 0, skipped: 0 });
     setError("");
-    const orderedTracks = new Map<number, Track>();
+    let reader: ReturnType<typeof import("@/lib/read-fit-files")["createFitReader"]> | null = null;
     try {
-      const response = await fetch("/api/intervals/import", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ apiKey: key }) });
-      if (!response.ok || !response.body) {
-        const result = response.headers.get("content-type")?.includes("application/json") ? await response.json() : null;
-        throw new Error(result?.error || "The Intervals.icu import could not start.");
-      }
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let pending = "";
-      let fatal = "";
-      const handle = (line: string) => {
-        if (!line.trim()) return;
-        const event = JSON.parse(line);
-        if (event.type === "start") {
-          setImportProgress({ completed: 0, total: event.total, imported: 0, skipped: event.stubCount });
-          if (event.stubCount) setSkipped([`${event.stubCount} Strava-only activit${event.stubCount === 1 ? "y was" : "ies were"} unavailable to connected apps.`]);
-        } else if (event.type === "track") {
-          orderedTracks.set(event.index, event.track as Track);
-        } else if (event.type === "skip") {
-          setSkipped(previous => [...previous, event.message]);
-        } else if (event.type === "progress") {
-          setImportProgress({ completed: event.completed, total: event.total, imported: event.imported, skipped: event.skipped });
-        } else if (event.type === "done") {
-          setTracks([...orderedTracks.entries()].sort((a, b) => a[0] - b[0]).map(([, track]) => track));
-        } else if (event.type === "fatal") {
-          fatal = event.message;
-        }
-      };
-      while (true) {
-        const { done, value } = await reader.read();
-        pending += decoder.decode(value, { stream: !done });
-        const lines = pending.split("\n");
-        pending = lines.pop() ?? "";
-        lines.forEach(handle);
-        if (done) break;
-      }
-      if (pending) handle(pending);
-      if (fatal) throw new Error(fatal);
-      if (!orderedTracks.size) setError("No map tracks were available in the latest Intervals.icu activities.");
+      const [{ importLatestActivities }, { createFitReader }] = await Promise.all([import("@/lib/intervals"), import("@/lib/read-fit-files")]);
+      reader = createFitReader();
+      const result = await importLatestActivities(key, reader.read, setImportProgress);
+      setTracks(result.tracks);
+      setSkipped(result.skipped);
+      if (!result.tracks.length) setError("No map tracks were available in the latest Intervals.icu activities.");
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : "The Intervals.icu import failed.");
     } finally {
+      reader?.close();
       setBusy(false);
     }
   }
@@ -145,7 +110,7 @@ export default function Home() {
     {!!tracks.length && <section ref={latestStep} className={styles.trackSection} aria-labelledby="track-title">
       <h2 id="track-title">Your tracks</h2>
       <p className={styles.success} role="status">{tracks.length.toLocaleString()} track(s) created — {tracks.reduce((sum, track) => sum + track.points.length, 0).toLocaleString()} GPS points.</p>
-      <TrackMap tracks={tracks} />
+      <Suspense fallback={<p className={styles.mapLoading} role="status">Loading your map…</p>}><TrackMap tracks={tracks} /></Suspense>
       <ul className={styles.trackCards} aria-label="Track legend and ride summaries">{tracks.map((track, index) => <li key={`${track.name}-${index}`} className={styles.trackCard} style={{ "--track-color": getTrackColor(index, tracks.length) } as CSSProperties}>
         <h3>{index + 1}. {track.name}</h3>
         <p>GPS distance: {(track.distanceMeters / 1000).toLocaleString(undefined, {maximumFractionDigits: 2})} km · Moving time: {formatHumanDuration(track.movingSeconds)} · {track.points.length.toLocaleString()} GPS points · Finishes at {(clipDurations[index] / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 })}s in the clip</p>
@@ -157,7 +122,7 @@ export default function Home() {
       <div>
         <h2 id="intervals-title">Intervals.icu</h2>
         <p className={styles.hint}>Import your latest 100 activities. Find your API key under Developer Settings in <a href="https://intervals.icu/settings" target="_blank" rel="noreferrer">Intervals.icu settings</a>.</p>
-        <p id="api-key-help" className={styles.hint}>Your key is used only for this import and is not saved. Personal keys grant broader access, but this app only reads activities.</p>
+        <p id="api-key-help" className={styles.hint}>Your key goes straight from your browser to Intervals.icu, is used only for this import and is not saved. Personal keys grant broader access, but this app only reads activities.</p>
       </div>
       <form className={styles.integrationActions} onSubmit={event => { event.preventDefault(); if (!busy && apiKey.trim()) void importIntervals(apiKey.trim()); }}>
         <label htmlFor="intervals-api-key">API key</label>

@@ -39,6 +39,7 @@ export async function expandFitInputs(incoming: File[], existing: Pick<File, "na
     try {
       for await (const entry of reader.getEntriesGenerator()) {
         if (++entries > MAX_ZIP_ENTRIES) throw new Error("ZIP selection contains more than 1,000 archive entries.");
+        // eslint-disable-next-line no-control-regex -- rejecting control characters is the point
         if (entry.filename.length > 512 || /[\x00-\x1f\x7f]/.test(entry.filename)) throw new Error("ZIP contains an unsafe filename.");
         if (entry.encrypted) throw new Error("Password-protected ZIP files are not supported.");
         if (entry.symlink) throw new Error("ZIP symbolic links are not supported.");
@@ -65,7 +66,7 @@ export async function expandFitInputs(incoming: File[], existing: Pick<File, "na
       }
       if (!fits) throw new Error("ZIP contains no supported FIT files.");
     } catch (error) {
-      throw new Error(`${input.name}: ${error instanceof Error ? error.message : "Invalid ZIP archive."}`);
+      throw new Error(`${input.name}: ${error instanceof Error ? error.message : "Invalid ZIP archive."}`, { cause: error });
     } finally {
       await reader.close();
     }
