@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState, type CSSProperties } from "react";
 import { MAX_BATCH_BYTES, MAX_FIT_BYTES, MAX_FIT_FILES, MAX_ZIP_BYTES, formatBytes, validateFitBatch } from "@/lib/fit/limits";
-import { getTrackColor } from "@/lib/clip/track-colors";
+import { trackColors, type ColorMode } from "@/lib/clip/track-colors";
 import { CLIP_SECONDS, trackDurationsMs } from "@/lib/clip/timing";
 import { formatHumanDuration } from "@/lib/format";
 import type { Track } from "@/lib/track";
@@ -20,6 +20,7 @@ export default function App() {
   const [importProgress, setImportProgress] = useState<ImportProgress | null>(null);
   const [dragging, setDragging] = useState(false);
   const [clipSeconds, setClipSeconds] = useState<number>(CLIP_SECONDS.default);
+  const [colorMode, setColorMode] = useState<ColorMode>("ride");
 
   const selecting = useRef(false);
   const [extracting, setExtracting] = useState(false);
@@ -101,6 +102,7 @@ export default function App() {
   }, [tracks]);
 
   const clipDurations = trackDurationsMs(tracks, clipSeconds * 1000);
+  const colors = trackColors(tracks, colorMode);
   const totalFileMb = Math.round(files.reduce((sum, f) => sum + f.size, 0) / (1024 * 1024));
 
   return <main className={styles.page}><section className={styles.panel} aria-busy={busy}>
@@ -110,8 +112,8 @@ export default function App() {
     {!!tracks.length && <section ref={latestStep} className={styles.trackSection} aria-labelledby="track-title">
       <h2 id="track-title">Your tracks</h2>
       <p className={styles.success} role="status">{tracks.length.toLocaleString()} track(s) created — {tracks.reduce((sum, track) => sum + track.path.latitudes.length, 0).toLocaleString()} GPS points.</p>
-      <Suspense fallback={<p className={styles.mapLoading} role="status">Loading your map…</p>}><TrackMap tracks={tracks} clipSeconds={clipSeconds} onClipSecondsChange={setClipSeconds} /></Suspense>
-      <ul className={styles.trackCards} aria-label="Track legend and ride summaries">{tracks.map((track, index) => <li key={`${track.name}-${index}`} className={styles.trackCard} style={{ "--track-color": getTrackColor(index, tracks.length) } as CSSProperties}>
+      <Suspense fallback={<p className={styles.mapLoading} role="status">Loading your map…</p>}><TrackMap tracks={tracks} colors={colors} clipSeconds={clipSeconds} onClipSecondsChange={setClipSeconds} colorMode={colorMode} onColorModeChange={setColorMode} /></Suspense>
+      <ul className={styles.trackCards} aria-label="Track legend and ride summaries">{tracks.map((track, index) => <li key={`${track.name}-${index}`} className={styles.trackCard} style={{ "--track-color": colors[index] } as CSSProperties}>
         <h3>{index + 1}. {track.name}</h3>
         <p>GPS distance: {(track.distanceMeters / 1000).toLocaleString(undefined, {maximumFractionDigits: 2})} km · Moving time: {formatHumanDuration(track.movingSeconds)} · {track.path.latitudes.length.toLocaleString()} GPS points · Finishes at {(clipDurations[index] / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 })}s in the clip</p>
         {!!track.warnings.length && <ul className={styles.warnings}>{track.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>}

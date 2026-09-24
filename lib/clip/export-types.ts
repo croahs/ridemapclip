@@ -1,4 +1,5 @@
 import type { MapTheme } from "./map-theme";
+import type { ColorMode } from "./track-colors";
 import type { ClipView } from "./renderer";
 import type { Track } from "../track";
 
@@ -6,7 +7,7 @@ import type { Track } from "../track";
 export type MapFrame = { x: number; y: number; width: number; height: number };
 
 /** The map view is frozen at capture time: later map movement cannot change the video. */
-export type RenderRequest = { tracks: Track[]; clipMs: number; theme: MapTheme; width: number; height: number; background: ImageBitmap; view: ClipView; frame: MapFrame };
+export type RenderRequest = { tracks: Track[]; clipMs: number; colorMode: ColorMode; theme: MapTheme; width: number; height: number; background: ImageBitmap; view: ClipView; frame: MapFrame };
 
 export type RenderMessage =
   | { type: "progress"; fraction: number; message: string }

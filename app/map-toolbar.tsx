@@ -1,22 +1,39 @@
 import { useState } from "react";
 import { CLIP_SECONDS, clampClipSeconds } from "@/lib/clip/timing";
 import type { MapTheme } from "@/lib/clip/map-theme";
+import type { ColorMode } from "@/lib/clip/track-colors";
 import { VIDEO_FORMATS, type VideoFormat } from "@/lib/clip/video-format";
 import styles from "./app.module.css";
 
 type Props = {
   clipSeconds: number; onClipSecondsChange: (seconds: number) => void;
+  colorMode: ColorMode; onColorModeChange: (mode: ColorMode) => void;
   mapTheme: MapTheme; onMapTheme: (theme: MapTheme) => void;
   videoFormat: VideoFormat; onVideoFormat: (format: VideoFormat) => void;
   rendering: boolean; onRecenter: () => void;
 };
 
-/** Clip length, map theme, video format and recentring. */
-export default function MapToolbar({ clipSeconds, onClipSecondsChange, mapTheme, onMapTheme, videoFormat, onVideoFormat, rendering, onRecenter }: Props) {
+/** Clip length, colour mode, map theme, video format and recentring. */
+export default function MapToolbar({ clipSeconds, onClipSecondsChange, colorMode, onColorModeChange, mapTheme, onMapTheme, videoFormat, onVideoFormat, rendering, onRecenter }: Props) {
   return (
     <div className={styles.mapToolbar}>
       <div className={styles.mapOptions}>
         <ClipLength seconds={clipSeconds} disabled={rendering} onChange={onClipSecondsChange} />
+        <div className={styles.themeControl} role="group" aria-label="Track colors">
+          <span>Colors</span>
+          {([["ride", "By ride"], ["date", "By date"]] as const).map(([mode, label]) => (
+            <button
+              key={mode}
+              type="button"
+              className={`${styles.secondaryButton} ${colorMode === mode ? styles.themeButtonActive : ""}`}
+              disabled={rendering}
+              aria-pressed={colorMode === mode}
+              onClick={() => onColorModeChange(mode)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <div className={styles.themeControl} role="group" aria-label="Map theme">
           <span>Map</span>
           {(["dark", "light"] as const).map((theme) => (

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { trackDurationsMs } from "@/lib/clip/timing";
 import type { MapTheme } from "@/lib/clip/map-theme";
+import type { ColorMode } from "@/lib/clip/track-colors";
 import { VIDEO_FORMATS, type VideoFormat } from "@/lib/clip/video-format";
 import type { Track } from "@/lib/track";
 import VideoExport from "./video-export";
@@ -9,7 +10,13 @@ import MapToolbar from "./map-toolbar";
 import { useClipPreview } from "./use-clip-preview";
 import styles from "./app.module.css";
 
-export default function TrackMap({ tracks, clipSeconds, onClipSecondsChange }: { tracks: Track[]; clipSeconds: number; onClipSecondsChange: (seconds: number) => void }) {
+type Props = {
+  tracks: Track[]; colors: string[];
+  clipSeconds: number; onClipSecondsChange: (seconds: number) => void;
+  colorMode: ColorMode; onColorModeChange: (mode: ColorMode) => void;
+};
+
+export default function TrackMap({ tracks, colors, clipSeconds, onClipSecondsChange, colorMode, onColorModeChange }: Props) {
   const clipMs = clipSeconds * 1000;
   const [rendering, setRendering] = useState(false);
   const [mapTheme, setMapTheme] = useState<MapTheme>("dark");
@@ -18,7 +25,7 @@ export default function TrackMap({ tracks, clipSeconds, onClipSecondsChange }: {
   const [fullscreen, setFullscreen] = useState(false);
   const [fullscreenError, setFullscreenError] = useState("");
   const durations = useMemo(() => trackDurationsMs(tracks, clipMs), [tracks, clipMs]);
-  const { container, mapRef, controls, status, elapsed, tileError, recenter } = useClipPreview({ tracks, clipMs, mapTheme, videoFormat });
+  const { container, mapRef, controls, status, elapsed, tileError, recenter } = useClipPreview({ tracks, clipMs, colorMode, mapTheme, videoFormat });
 
   const [controlsVisible, setControlsVisible] = useState(true);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -76,12 +83,12 @@ export default function TrackMap({ tracks, clipSeconds, onClipSecondsChange }: {
       onMouseEnter={onUserActivity}
       onClick={onUserActivity}
     >
-      <VideoExport tracks={tracks} clipMs={clipMs} mapTheme={mapTheme} videoFormat={videoFormat} getMap={() => mapRef.current} pausePreview={() => controls.current?.pause()} onBusy={setRendering} />
-      <PlaybackPanel tracks={tracks} durations={durations} clipSeconds={clipSeconds} status={status} elapsed={elapsed} rendering={rendering} fullscreen={fullscreen}
+      <VideoExport tracks={tracks} clipMs={clipMs} colorMode={colorMode} mapTheme={mapTheme} videoFormat={videoFormat} getMap={() => mapRef.current} pausePreview={() => controls.current?.pause()} onBusy={setRendering} />
+      <PlaybackPanel tracks={tracks} colors={colors} durations={durations} clipSeconds={clipSeconds} status={status} elapsed={elapsed} rendering={rendering} fullscreen={fullscreen}
         onPlay={() => controls.current?.play()} onPause={() => controls.current?.pause()} onRestart={() => controls.current?.replay()} onFullscreen={toggleFullscreen} />
       {fullscreenError && <p className={styles.error} role="alert">{fullscreenError}</p>}
       {tracks.some((track) => !track.movingSeconds || track.movingSeconds <= 0) && <p className={styles.hint}>Rides without a moving time use the full clip length.</p>}
-      <MapToolbar clipSeconds={clipSeconds} onClipSecondsChange={onClipSecondsChange} mapTheme={mapTheme} onMapTheme={setMapTheme}
+      <MapToolbar clipSeconds={clipSeconds} onClipSecondsChange={onClipSecondsChange} colorMode={colorMode} onColorModeChange={onColorModeChange} mapTheme={mapTheme} onMapTheme={setMapTheme}
         videoFormat={videoFormat} onVideoFormat={setVideoFormat} rendering={rendering} onRecenter={recenter} />
       <div className={styles.mapWrapper} data-format={videoFormat} style={{ "--map-aspect-ratio": VIDEO_FORMATS[videoFormat].aspectRatio } as CSSProperties}>
         <div ref={container} className={styles.map} role="region" aria-label={`Interactive map of ${tracks.length} tracks`} />

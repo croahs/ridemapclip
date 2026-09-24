@@ -3,11 +3,12 @@ import type L from "leaflet";
 import type { Track } from "@/lib/track";
 import type { VideoProgress } from "@/lib/clip/export";
 import type { MapTheme } from "@/lib/clip/map-theme";
+import type { ColorMode } from "@/lib/clip/track-colors";
 import { VIDEO_FORMATS, type VideoFormat } from "@/lib/clip/video-format";
 import styles from "./app.module.css";
 
-export default function VideoExport({ tracks, clipMs, mapTheme, videoFormat, getMap, pausePreview, onBusy }: {
-  tracks: Track[]; clipMs: number; mapTheme: MapTheme; videoFormat: VideoFormat; getMap: () => L.Map | null; pausePreview: () => void; onBusy: (busy: boolean) => void;
+export default function VideoExport({ tracks, clipMs, colorMode, mapTheme, videoFormat, getMap, pausePreview, onBusy }: {
+  tracks: Track[]; clipMs: number; colorMode: ColorMode; mapTheme: MapTheme; videoFormat: VideoFormat; getMap: () => L.Map | null; pausePreview: () => void; onBusy: (busy: boolean) => void;
 }) {
   const [progress, setProgress] = useState<VideoProgress | null>(null);
   const [error, setError] = useState("");
@@ -33,7 +34,7 @@ export default function VideoExport({ tracks, clipMs, mapTheme, videoFormat, get
     handlers.forEach(handler => handler.disable());
     try {
       const { renderVideo } = await import("@/lib/clip/export");
-      const blob = await renderVideo(map, tracks, clipMs, mapTheme, videoFormat, task.signal, value => { if (!task.signal.aborted) setProgress(value); });
+      const blob = await renderVideo(map, tracks, clipMs, colorMode, mapTheme, videoFormat, task.signal, value => { if (!task.signal.aborted) setProgress(value); });
       if (task.signal.aborted) return;
       const next = URL.createObjectURL(blob);
       if (url.current) URL.revokeObjectURL(url.current);

@@ -1,19 +1,18 @@
 import { useState, type CSSProperties } from "react";
 import { currentTrackElapsedSeconds } from "@/lib/clip/timing";
-import { getTrackColor } from "@/lib/clip/track-colors";
 import { formatClipTime, formatDigitalTime } from "@/lib/format";
 import type { Track } from "@/lib/track";
 import type { PlaybackState } from "./use-clip-preview";
 import styles from "./app.module.css";
 
 type Props = {
-  tracks: Track[]; durations: number[]; clipSeconds: number; status: PlaybackState; elapsed: number;
+  tracks: Track[]; colors: string[]; durations: number[]; clipSeconds: number; status: PlaybackState; elapsed: number;
   rendering: boolean; fullscreen: boolean;
   onPlay: () => void; onPause: () => void; onRestart: () => void; onFullscreen: () => void;
 };
 
 /** Playback buttons, clip progress and each rider's live moving time. */
-export default function PlaybackPanel({ tracks, durations, clipSeconds, status, elapsed, rendering, fullscreen, onPlay, onPause, onRestart, onFullscreen }: Props) {
+export default function PlaybackPanel({ tracks, colors, durations, clipSeconds, status, elapsed, rendering, fullscreen, onPlay, onPause, onRestart, onFullscreen }: Props) {
   const [showRiderList, setShowRiderList] = useState(false);
   const clipMs = clipSeconds * 1000;
   const hasHourRides = tracks.some(track => (track.movingSeconds ?? 0) >= 3600);
@@ -54,7 +53,7 @@ export default function PlaybackPanel({ tracks, durations, clipSeconds, status, 
           {tracks.map((track, index) => {
             const currentSec = currentTrackElapsedSeconds(elapsed, durations[index], track.movingSeconds);
             const isFinished = durations[index] > 0 && elapsed >= durations[index];
-            const color = getTrackColor(index, tracks.length);
+            const color = colors[index];
             return (
               <div
                 key={`${track.name}-${index}`}

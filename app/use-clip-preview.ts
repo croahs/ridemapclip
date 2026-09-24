@@ -2,21 +2,23 @@ import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { ClipClock, videoFrameCount } from "@/lib/clip/timing";
-import { CLIP_STYLE, createScene, drawGlow, drawOverlays, drawRiders, drawTrails, type ClipView, type Point } from "@/lib/clip/renderer";
+import { CLIP_STYLE, createScene, recolorScene, drawGlow, drawOverlays, drawRiders, drawTrails, type ClipView, type Point } from "@/lib/clip/renderer";
 import { mapTileFilter, type MapTheme } from "@/lib/clip/map-theme";
 import type { VideoFormat } from "@/lib/clip/video-format";
+import type { ColorMode } from "@/lib/clip/track-colors";
 import type { Track } from "@/lib/track";
 import styles from "./app.module.css";
 
 export type PlaybackState = "ready" | "playing" | "paused" | "finished";
-export type PreviewControls = { play: () => void; pause: () => void; replay: () => void; repaint: () => void; setClipMs: (clipMs: number) => void };
+export type PreviewControls = { play: () => void; pause: () => void; replay: () => void; repaint: () => void; setClipMs: (clipMs: number) => void; setColorMode: (mode: ColorMode) => void };
 
 /**
  * The Leaflet map plus the canvas layers and playback clock of the clip preview.
  * Drawing goes through lib/clip/renderer, exactly like the video export.
  */
-export function useClipPreview({ tracks, clipMs, mapTheme, videoFormat }: { tracks: Track[]; clipMs: number; mapTheme: MapTheme; videoFormat: VideoFormat }) {
+export function useClipPreview({ tracks, clipMs, colorMode, mapTheme, videoFormat }: { tracks: Track[]; clipMs: number; colorMode: ColorMode; mapTheme: MapTheme; videoFormat: VideoFormat }) {
   const clipMsRef = useRef(clipMs);
+  const colorModeRef = useRef(colorMode);
   const mapThemeRef = useRef(mapTheme);
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -35,6 +37,11 @@ export function useClipPreview({ tracks, clipMs, mapTheme, videoFormat }: { trac
     clipMsRef.current = clipMs;
     controls.current?.setClipMs(clipMs);
   }, [clipMs]);
+
+  useEffect(() => {
+    colorModeRef.current = colorMode;
+    controls.current?.setColorMode(colorMode);
+  }, [colorMode]);
 
   useEffect(() => {
     mapThemeRef.current = mapTheme;
@@ -67,7 +74,7 @@ export function useClipPreview({ tracks, clipMs, mapTheme, videoFormat }: { trac
     tiles.on("tileerror", () => setTileError(true));
 
     // The preview draws with the same functions as the video export (lib/clip-renderer).
-    let scene = createScene(tracks, clipMsRef.current);
+    let scene = createScene(tracks, clipMsRef.current, colorModeRef.current);
     const layer = (pane: string, zIndex: number, className: string) => {
       const element = map.createPane(pane);
       element.style.zIndex = String(zIndex);
@@ -241,13 +248,17 @@ export function useClipPreview({ tracks, clipMs, mapTheme, videoFormat }: { trac
       setClipMs: (next: number) => {
         if (next === scene.clipMs) return;
         pause();
-        scene = createScene(tracks, next);
+        scene = createScene(tracks, next, colorModeRef.current);
         trailStepMs = scene.clipMs / (videoFrameCount(scene.clipMs) - 1);
         clock = new ClipClock(scene.clipMs);
         clearTrails();
         paint(0);
         setElapsed(0);
         setStatus("ready");
+      },
+      setColorMode: (mode: ColorMode) => {
+        recolorScene(scene, tracks, mode);
+        redraw();
       },
     };
     // Hidden tabs stop requesting frames. Pause explicitly rather than skipping

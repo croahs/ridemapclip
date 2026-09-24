@@ -11,12 +11,12 @@ function context(canvas: OffscreenCanvas) {
   return result;
 }
 
-async function render({ tracks, clipMs, theme, width, height, background, view, frame }: RenderRequest) {
+async function render({ tracks, clipMs, colorMode, theme, width, height, background, view, frame }: RenderRequest) {
   const quality = new Quality({ bitrate: 8_000_000 });
   if (!(await canEncodeVideo("avc", { width, height, quality }))) {
     throw new Error("This browser cannot create MP4 videos. Open the app in an up-to-date Chrome or Edge browser and try again.");
   }
-  const scene = createScene(tracks, clipMs);
+  const scene = createScene(tracks, clipMs, colorMode);
   const frames = videoFrameCount(clipMs);
   const clip = (ctx: OffscreenCanvasRenderingContext2D) => {
     ctx.beginPath(); ctx.rect(frame.x, frame.y, frame.width, frame.height); ctx.clip();

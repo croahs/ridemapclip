@@ -74,3 +74,20 @@ test("the chosen clip length drives preview and video", async ({ page }) => {
   await expect(page.getByText("Your video is ready.")).toBeVisible({ timeout: 180000 });
   await expect.poll(() => page.locator("video").evaluate(element => (element as HTMLVideoElement).duration)).toBe(15);
 });
+
+test("date colours run from the earliest ride to the latest in cards and video", async ({ page }) => {
+  await stubTiles(page);
+  await page.goto("/");
+  await page.locator('input[type="file"]').setInputFiles([
+    rideFit("middle.fit", 0, 300, new Date("2025-01-01T08:00:00Z")),
+    rideFit("latest.fit", 2, 300, new Date("2026-01-01T08:00:00Z")),
+    rideFit("earliest.fit", 4, 300, new Date("2024-01-01T08:00:00Z")),
+  ]);
+  await page.getByRole("button", { name: "Create 3 tracks", exact: true }).click();
+  await page.getByRole("button", { name: "By date", exact: true }).click();
+  const color = (name: string) => page.locator("li", { hasText: name }).first().evaluate(element => getComputedStyle(element).getPropertyValue("--track-color").trim());
+  expect(await color("earliest.fit")).toBe("#0ea5e9");
+  expect(await color("latest.fit")).toBe("#f97316");
+  await page.getByRole("button", { name: "Create video", exact: true }).click();
+  await expect(page.getByText("Your video is ready.")).toBeVisible({ timeout: 180000 });
+});
