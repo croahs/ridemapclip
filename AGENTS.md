@@ -7,7 +7,7 @@ RideMapClip is a static Vite + React app: everything runs in the browser, with n
 - pnpm only. `pnpm check` (typecheck, lint, unit tests) must pass before any commit.
 - Anything that touches the UI, rendering or file reading: also `pnpm build && pnpm test:browser` (needs Google Chrome; tests use synthetic FIT files and stubbed tiles).
 - Rendering performance: `PERF=1 pnpm test:browser export-perf`, before and after.
-- Pushing `main` deploys to https://ridemapclip.vercel.app (Vercel, `vercel.json`) and runs CI (`.github/workflows/ci.yml`). Check the live page after UI changes.
+- Pushing `main` deploys to https://ridemapclip.vercel.app (Vercel, `vercel.json`) and runs CI (`.github/workflows/ci.yml`). After UI changes, verify the deploy: `BASE_URL=https://ridemapclip.vercel.app pnpm test:browser`.
 - `fitexample/` is Peder's private ride set (gitignored). Never commit it or other real rides; they contain home locations.
 
 ## Product rules
