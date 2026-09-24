@@ -106,38 +106,16 @@
   border-radius: 0 !important;
 }
 
-.player:fullscreen .mapOverlayTopLeft {
-  top: 24px;
-  left: 24px;
-  gap: 12px;
-}
-
-.mapOverlayTopLeft {
+.mapOverlayControls {
   position: absolute;
-  top: 16px;
-  left: 16px;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 1000;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 10px;
   pointer-events: none;
 }
 
-.mapWatermark {
-  padding: 5px 8px;
-  border: 1px solid #ffffff33;
-  border-radius: 6px;
-  background: #0f172a99;
-  color: #f8fafc;
-  font-size: .7rem;
-  font-weight: 700;
-  letter-spacing: .04em;
-  text-shadow: 0 1px 2px #00000099;
-  pointer-events: none;
-}
 
-.player:fullscreen .mapWatermark { font-size: .9rem; padding: 7px 10px; }
 
 .fullscreenControls {
   display: flex;
@@ -185,28 +163,7 @@
   color: #ffffff;
 }
 
-.overlayTimeBadge {
-  background: #0f172abf;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid #ffffff33;
-  border-radius: 10px;
-  padding: 6px 14px;
-  font-size: 1.6rem;
-  font-weight: 800;
-  color: #ffffff;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.01em;
-  line-height: 1.1;
-  box-shadow: 0 4px 14px #00000066;
-  text-shadow: 0 1px 2px #00000099;
-}
 
-.player:fullscreen .overlayTimeBadge {
-  font-size: 2.2rem;
-  padding: 10px 20px;
-  border-radius: 12px;
-}
 
 .packTelemetryBar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 14px; padding: 10px 14px; background: #0f172a80; border: 1px solid #334155; border-radius: 8px; }
 .packTelemetryStats { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
@@ -226,10 +183,10 @@
 .telemetryTotal { font-size: 0.8rem; font-weight: 400; color: #94a3b8; }
 .telemetryMissing { font-size: 0.8rem; color: #94a3b8; font-weight: normal; }
 
-.riderGlowTrail {
-  filter: blur(1.5px) drop-shadow(0 0 4px #fff);
-  pointer-events: none;
-}
+/* Canvas layers drawn by lib/clip-renderer. The glow filter mirrors CLIP_STYLE.glowBlur/glowShadow. */
+.clipLayer { position: absolute; pointer-events: none; }
+.clipOverlay { position: absolute; inset: 0; z-index: 700; pointer-events: none; }
+.riderGlowTrail { filter: blur(1.5px) drop-shadow(0 0 4px #fff); }
 
 .mapTile { filter: var(--map-tile-filter); }
 .themeControl { display: flex; align-items: center; gap: 6px; color: #cbd5e1; }

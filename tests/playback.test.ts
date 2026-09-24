@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { CLIP_DURATION_MS, CLIP_DURATION_SECONDS, ClipClock } from "../lib/clip";
-import { createPlaybackRoute, playbackFrame, playbackSlice } from "../lib/playback";
+import { createPlaybackRoute, playbackPosition, playbackSlice } from "../lib/playback";
+import { pixelRoute, pixelTail } from "../lib/clip-renderer";
 import type { TrackPoint } from "../lib/track";
 import { chronologicalTrailSlices } from "../lib/trail-order";
 
@@ -35,33 +36,34 @@ test("pause/resume preserves remaining duration; replay starts from zero", () =>
 
 test("progress uses distance, not sample count, and ends exactly at the finish", () => {
   const route = createPlaybackRoute([point(0), point(0.001), point(0.01)]);
-  assert.deepEqual(playbackFrame(route, 0).position, [0, 0]);
-  assert.ok(Math.abs(playbackFrame(route, 0.5).position[1] - 0.005) < 1e-9);
-  assert.deepEqual(playbackFrame(route, 1).position, [0, 0.01]);
-  assert.deepEqual(playbackFrame(route, 1.5).position, [0, 0.01]);
-  assert.deepEqual(playbackFrame(route, -1).position, [0, 0]);
+  assert.deepEqual(playbackPosition(route, 0), [0, 0]);
+  assert.ok(Math.abs(playbackPosition(route, 0.5)[1] - 0.005) < 1e-9);
+  assert.deepEqual(playbackPosition(route, 1), [0, 0.01]);
+  assert.deepEqual(playbackPosition(route, 1.5), [0, 0.01]);
+  assert.deepEqual(playbackPosition(route, -1), [0, 0]);
 });
 
 test("GPS gaps are neither interpolated nor connected by the revealed trail", () => {
   const route = createPlaybackRoute([point(0), point(1), point(10, true), point(11)]);
-  assert.ok(playbackFrame(route, 0.49).position[1] < 1);
-  assert.ok(playbackFrame(route, 0.51).position[1] > 10);
-  const frame = playbackFrame(route, 1);
-  assert.deepEqual(frame.sections, [[[0, 0], [0, 1]], [[0, 10], [0, 11]]]);
+  assert.ok(playbackPosition(route, 0.49)[1] < 1);
+  assert.ok(playbackPosition(route, 0.51)[1] > 10);
+  const pixels = pixelRoute(route, 0, 0);
+  const tail = pixelTail(pixels, 3, pixels.points[3], 1000);
+  assert.deepEqual(tail.slice(1), [pixels.points[3], pixels.points[2]]);
 });
 
 test("dateline playback takes the short path without circling the globe", () => {
   const route = createPlaybackRoute([point(179.9), point(-179.9)]);
-  assert.ok(Math.abs(playbackFrame(route, 0.5).position[1] - 180) < 1e-9);
+  assert.ok(Math.abs(playbackPosition(route, 0.5)[1] - 180) < 1e-9);
 });
 
 test("repeated locations and isolated GPS points produce finite positions", () => {
   for (const points of [[point(1), point(1), point(2)], [point(1), point(3, true), point(5, true)]]) {
     const route = createPlaybackRoute(points);
     for (const progress of [0, 0.25, 0.5, 0.99, 1]) {
-      assert.ok(playbackFrame(route, progress).position.every(Number.isFinite));
+      assert.ok(playbackPosition(route, progress).every(Number.isFinite));
     }
-    assert.deepEqual(playbackFrame(route, 1).position, [0, points.at(-1)!.longitude]);
+    assert.deepEqual(playbackPosition(route, 1), [0, points.at(-1)!.longitude]);
   }
 });
 
@@ -69,9 +71,18 @@ test("large recordings keep accurate positions with a bounded preview trail", ()
   const route = createPlaybackRoute(Array.from({ length: 200_000 }, (_, index) => point(index / 1_000_000)));
   assert.ok(route.displayIndices.length <= 6002);
   assert.equal(route.coordinates.length, 200_000);
-  const frame = playbackFrame(route, 1);
-  assert.deepEqual(frame.position, [0, 0.199999]);
-  assert.ok(frame.sections[0].length <= 6002);
+  assert.deepEqual(playbackPosition(route, 1), [0, 0.199999]);
+});
+
+test("glow tails follow the route behind the rider, cut to length, without sub-pixel detail", () => {
+  const route = createPlaybackRoute(Array.from({ length: 1001 }, (_, i) => point(i / 1000)));
+  const pixels = pixelRoute(route, 0, 0.5);
+  assert.ok(pixels.points.length < 10);
+  assert.equal(pixels.source.at(-1), 1000);
+  const tip = pixels.points.at(-1)!;
+  const tail = pixelTail(pixels, 1000, tip, 0.2);
+  const end = tail.at(-1)!;
+  assert.ok(Math.abs(Math.hypot(end[0] - tip[0], end[1] - tip[1]) - 0.2) < 1e-9);
 });
 
 test("playback slices contain only the newly drawn route", () => {

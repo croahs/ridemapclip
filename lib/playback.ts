@@ -37,7 +37,7 @@ export function createPlaybackRoute(points: TrackPoint[]): PlaybackRoute {
   return { coordinates, distances, totalDistance, displayIndices, breaks: points.map((point) => point.breakBefore) };
 }
 
-function playbackLocation(route: PlaybackRoute, progress: number): PlaybackLocation {
+export function playbackLocation(route: PlaybackRoute, progress: number): PlaybackLocation {
   const fraction = Math.min(1, Math.max(0, progress));
   const last = route.coordinates.length - 1;
   let index = 0;
@@ -70,20 +70,20 @@ function sameCoordinate(left: Coordinate, right: Coordinate) {
   return left[0] === right[0] && left[1] === right[1];
 }
 
-export function playbackFrame(route: PlaybackRoute, progress: number): { position: Coordinate; sections: Coordinate[][] } {
-  const { index, ratio, position } = playbackLocation(route, progress);
-  const current = route.coordinates[index];
-  const sections: Coordinate[][] = [];
-  for (const displayIndex of route.displayIndices) {
-    if (displayIndex > index) break;
-    if (!sections.length || route.breaks[displayIndex]) sections.push([]);
-    sections[sections.length - 1].push(route.coordinates[displayIndex]);
+/** Index into displayIndices of the first entry greater than `index`. */
+function displayAfter(route: PlaybackRoute, index: number) {
+  let low = 0;
+  let high = route.displayIndices.length;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if (route.displayIndices[middle] <= index) low = middle + 1;
+    else high = middle;
   }
-  // Include the current original vertex so the moving tip stays on the track.
-  const section = sections[sections.length - 1];
-  if (section[section.length - 1] !== current) section.push(current);
-  if (ratio > 0) section.push(position);
-  return { position, sections };
+  return low;
+}
+
+export function playbackPosition(route: PlaybackRoute, progress: number): Coordinate {
+  return playbackLocation(route, progress).position;
 }
 
 /** Returns only the newly revealed route between two playback positions. */
@@ -101,15 +101,7 @@ export function playbackSlice(route: PlaybackRoute, fromProgress: number, toProg
     if (section.length > 1) sections.push(section);
   };
 
-  let low = 0;
-  let high = route.displayIndices.length;
-  while (low < high) {
-    const middle = Math.floor((low + high) / 2);
-    if (route.displayIndices[middle] <= start.index) low = middle + 1;
-    else high = middle;
-  }
-
-  for (let displayPosition = low; displayPosition < route.displayIndices.length; displayPosition++) {
+  for (let displayPosition = displayAfter(route, start.index); displayPosition < route.displayIndices.length; displayPosition++) {
     const displayIndex = route.displayIndices[displayPosition];
     if (displayIndex > end.index) break;
     if (route.breaks[displayIndex]) {
