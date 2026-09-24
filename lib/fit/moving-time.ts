@@ -1,4 +1,5 @@
-import { distanceBetween, type TrackPoint } from "../track";
+import { distanceBetween } from "../track";
+import type { TrackPoint } from "./types";
 
 type TimerEvent = { timestamp?: unknown; event?: unknown; eventType?: unknown };
 type Session = { totalMovingTime?: unknown };

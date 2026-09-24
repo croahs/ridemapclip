@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState, type CSSProperties } from "react";
-import { MAX_FIT_FILES, validateFitBatch } from "@/lib/fit/limits";
+import { MAX_BATCH_BYTES, MAX_FIT_BYTES, MAX_FIT_FILES, MAX_ZIP_BYTES, formatBytes, validateFitBatch } from "@/lib/fit/limits";
 import { getTrackColor } from "@/lib/clip/track-colors";
 import { CLIP_SECONDS, trackDurationsMs } from "@/lib/clip/timing";
 import { formatHumanDuration } from "@/lib/format";
@@ -104,16 +104,16 @@ export default function App() {
   const totalFileMb = Math.round(files.reduce((sum, f) => sum + f.size, 0) / (1024 * 1024));
 
   return <main className={styles.page}><section className={styles.panel} aria-busy={busy}>
-    <p className={styles.kicker}>RideMapClip · Up to 200 rides</p>
+    <p className={styles.kicker}>RideMapClip · Up to {MAX_FIT_FILES.toLocaleString()} rides</p>
     <h1>See where you rode.</h1>
     <p className={styles.subtitle}>Use Intervals.icu to import your latest 100 activities automatically, or add FIT recordings from your device.</p>
     {!!tracks.length && <section ref={latestStep} className={styles.trackSection} aria-labelledby="track-title">
       <h2 id="track-title">Your tracks</h2>
-      <p className={styles.success} role="status">{tracks.length.toLocaleString()} track(s) created — {tracks.reduce((sum, track) => sum + track.points.length, 0).toLocaleString()} GPS points.</p>
+      <p className={styles.success} role="status">{tracks.length.toLocaleString()} track(s) created — {tracks.reduce((sum, track) => sum + track.path.latitudes.length, 0).toLocaleString()} GPS points.</p>
       <Suspense fallback={<p className={styles.mapLoading} role="status">Loading your map…</p>}><TrackMap tracks={tracks} clipSeconds={clipSeconds} onClipSecondsChange={setClipSeconds} /></Suspense>
       <ul className={styles.trackCards} aria-label="Track legend and ride summaries">{tracks.map((track, index) => <li key={`${track.name}-${index}`} className={styles.trackCard} style={{ "--track-color": getTrackColor(index, tracks.length) } as CSSProperties}>
         <h3>{index + 1}. {track.name}</h3>
-        <p>GPS distance: {(track.distanceMeters / 1000).toLocaleString(undefined, {maximumFractionDigits: 2})} km · Moving time: {formatHumanDuration(track.movingSeconds)} · {track.points.length.toLocaleString()} GPS points · Finishes at {(clipDurations[index] / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 })}s in the clip</p>
+        <p>GPS distance: {(track.distanceMeters / 1000).toLocaleString(undefined, {maximumFractionDigits: 2})} km · Moving time: {formatHumanDuration(track.movingSeconds)} · {track.path.latitudes.length.toLocaleString()} GPS points · Finishes at {(clipDurations[index] / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 })}s in the clip</p>
         {!!track.warnings.length && <ul className={styles.warnings}>{track.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>}
       </li>)}</ul>
       <p className={styles.hint}>All tracks start together. The longest moving time becomes {clipSeconds} seconds; shorter rides finish proportionally earlier and stay visible. Pauses are excluded from ride timing; movement along each route remains steady.</p>
@@ -127,7 +127,7 @@ export default function App() {
       <input id="fit-file" type="file" accept=".fit,.zip" multiple disabled={busy} aria-describedby="file-help" onChange={(event) => {
         selectFiles(Array.from(event.target.files ?? [])); event.target.value = "";
       }} />
-      <p id="file-help" className={styles.hint}>Up to 200 FIT files · 20 MB per FIT · 100 MB per ZIP · 500 MB extracted total · GPS required</p>
+      <p id="file-help" className={styles.hint}>Up to {MAX_FIT_FILES.toLocaleString()} FIT files · {formatBytes(MAX_FIT_BYTES)} per FIT · {formatBytes(MAX_ZIP_BYTES)} per ZIP · {formatBytes(MAX_BATCH_BYTES)} extracted total · GPS required</p>
     </div>
     <div className={styles.fileSelectionSummary}>
       <p className={styles.hint} role="status">{files.length} of {MAX_FIT_FILES} files selected{files.length > 0 ? ` (${totalFileMb} MB)` : ""}</p>

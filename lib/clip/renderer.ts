@@ -1,4 +1,4 @@
-import { createPlaybackRoute, playbackLocation, type PlaybackRoute } from "./playback";
+import { createPlaybackRoute, playbackLocation, routeCoordinate, type PlaybackRoute } from "./playback";
 import { chronologicalTrailSlices } from "./trail-order";
 import { getTrackColor } from "./track-colors";
 import { glowOpacityMultiplier, type MapTheme } from "./map-theme";
@@ -49,7 +49,7 @@ export function createScene(tracks: Track[], clipMs: number): ClipScene {
   const durations = trackDurationsMs(tracks, clipMs);
   return {
     clipMs,
-    riders: tracks.map((track, index) => ({ route: createPlaybackRoute(track.points), color: getTrackColor(index, tracks.length), durationMs: durations[index] })),
+    riders: tracks.map((track, index) => ({ route: createPlaybackRoute(track.path), color: getTrackColor(index, tracks.length), durationMs: durations[index] })),
     large: tracks.length > CLIP_STYLE.largePackAbove,
     longestSeconds: Math.max(0, ...tracks.map(track => track.movingSeconds ?? 0)),
     pixelRoutes: new Map(),
@@ -73,10 +73,10 @@ export function pixelRoute(route: PlaybackRoute, zoom: number, spacing: number):
   const points: Point[] = [];
   const source: number[] = [];
   const sectionStart: boolean[] = [];
-  const last = route.coordinates.length - 1;
+  const last = route.latitudes.length - 1;
   for (let index = 0; index <= last; index++) {
-    const point = mercator(route.coordinates[index], zoom);
-    const start = index === 0 || route.breaks[index];
+    const point = mercator(routeCoordinate(route, index), zoom);
+    const start = index === 0 || route.breaks[index] === 1;
     const previous = points[points.length - 1];
     if (!start && index !== last && !route.breaks[index + 1] && Math.hypot(point[0] - previous[0], point[1] - previous[1]) < spacing) continue;
     points.push(point); source.push(index); sectionStart.push(start);

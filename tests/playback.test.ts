@@ -1,11 +1,16 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createPlaybackRoute, playbackPosition, playbackSlice } from "../lib/clip/playback";
+import { createPlaybackRoute as createRoute, playbackPosition, playbackSlice } from "../lib/clip/playback";
 import { pixelRoute, pixelTail } from "../lib/clip/renderer";
-import type { TrackPoint } from "../lib/track";
 import { chronologicalTrailSlices } from "../lib/clip/trail-order";
 
-const point = (longitude: number, breakBefore = false): TrackPoint => ({ latitude: 0, longitude, timestamp: null, elevationMeters: null, breakBefore });
+type Point = { longitude: number; breakBefore: boolean };
+const point = (longitude: number, breakBefore = false): Point => ({ longitude, breakBefore });
+const createPlaybackRoute = (points: Point[]) => createRoute({
+  latitudes: new Float64Array(points.length),
+  longitudes: Float64Array.from(points, p => p.longitude),
+  breaks: Uint8Array.from(points, p => p.breakBefore ? 1 : 0),
+});
 
 test("progress uses distance, not sample count, and ends exactly at the finish", () => {
   const route = createPlaybackRoute([point(0), point(0.001), point(0.01)]);
@@ -43,7 +48,7 @@ test("repeated locations and isolated GPS points produce finite positions", () =
 test("large recordings keep accurate positions with a bounded preview trail", () => {
   const route = createPlaybackRoute(Array.from({ length: 200_000 }, (_, index) => point(index / 1_000_000)));
   assert.ok(route.displayIndices.length <= 6002);
-  assert.equal(route.coordinates.length, 200_000);
+  assert.equal(route.latitudes.length, 200_000);
   assert.deepEqual(playbackPosition(route, 1), [0, 0.199999]);
 });
 

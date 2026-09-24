@@ -4,11 +4,11 @@ import { Encoder, Profile } from "@garmin/fitsdk";
 import { movingTime } from "../lib/fit/moving-time";
 import { parseFit } from "../lib/fit/parse";
 import { trackDurationsMs } from "../lib/clip/timing";
-import type { TrackPoint } from "../lib/track";
+import type { TrackPoint } from "../lib/fit/types";
 const send = (encoder: Encoder, number: number, message: Record<string, unknown>) => encoder.onMesg(number, message);
 const start = Date.parse("2026-09-15T08:00:00Z");
 const date = (seconds: number) => new Date(start + seconds * 1000);
-const point = (seconds: number, latitude = 48 + seconds * 0.0001): TrackPoint => ({ latitude, longitude: 2, timestamp: date(seconds).toISOString(), elevationMeters: null, breakBefore: false });
+const point = (seconds: number, latitude = 48 + seconds * 0.0001): TrackPoint => ({ latitude, longitude: 2, timestamp: date(seconds).toISOString(), breakBefore: false });
 test("device moving time takes precedence over elapsed duration and estimates", () => {
   assert.deepEqual(movingTime([point(0), point(60)], [null, 5], [], [{totalMovingTime: 20}, {totalMovingTime: 10}]), {seconds: 30, estimated: false});
 });

@@ -4,7 +4,7 @@ export const TRACK_COLORS = ["#0284c7", "#dc2626", "#7c3aed", "#059669", "#d9770
 /**
  * Returns a high-contrast color for a track.
  * For <= 5 tracks, uses the hand-picked brand palette.
- * For > 5 tracks (up to 200+), uses the golden ratio hue distribution for maximum contrast between consecutive tracks.
+ * For > 5 tracks (up to 1000), uses the golden ratio hue distribution for maximum contrast between consecutive tracks.
  */
 export function getTrackColor(index: number, totalTracks = 1): string {
   if (totalTracks <= TRACK_COLORS.length && index < TRACK_COLORS.length) {

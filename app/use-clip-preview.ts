@@ -90,7 +90,9 @@ export function useClipPreview({ tracks, clipMs, mapTheme, videoFormat }: { trac
     const overlay = { canvas: overlayCanvas, ctx: overlayCtx };
 
     const bounds = L.latLngBounds([]);
-    for (const { route } of scene.riders) bounds.extend(L.latLngBounds(route.coordinates));
+    for (const { route } of scene.riders) {
+      for (let i = 0; i < route.latitudes.length; i++) bounds.extend([route.latitudes[i], route.longitudes[i]]);
+    }
     boundsRef.current = bounds;
     map.fitBounds(bounds, { padding: [CLIP_STYLE.fitPadding, CLIP_STYLE.fitPadding], maxZoom: 16 });
     // fitBounds initializes the view and creates the tile container.

@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { BlobWriter, Uint8ArrayReader, ZipWriter } from "@zip.js/zip.js";
-import { expandFitInputs, MAX_ZIP_BYTES, MAX_ZIP_ENTRIES } from "../lib/fit/zip";
-import { MAX_BATCH_BYTES, MAX_FIT_BYTES } from "../lib/fit/limits";
+import { expandFitInputs } from "../lib/fit/zip";
+import { MAX_BATCH_BYTES, MAX_FIT_BYTES, MAX_ZIP_BYTES, MAX_ZIP_ENTRIES } from "../lib/fit/limits";
 
 async function zip(entries: [string, Uint8Array][], options = {}) {
   const writer = new ZipWriter(new BlobWriter(), { useWebWorkers: false, ...options });
@@ -28,10 +28,10 @@ test("rejects corrupt ZIPs, nested archives, encrypted entries and unsafe paths"
 test("rejects empty archives and limits counts, input and cumulative output", async () => {
   await assert.rejects(expandFitInputs([await zip([["readme.txt", data]])]), /no supported FIT/);
   const archive = await zip([["ride.fit", data]]);
-  await assert.rejects(expandFitInputs([archive], Array.from({ length: 200 }, (_, i) => ({ name: `${i}.fit`, size: 1 }))), /200 FIT/);
-  await assert.rejects(expandFitInputs([archive], [{ name: "old.fit", size: MAX_BATCH_BYTES }]), /500 MB/);
-  await assert.rejects(expandFitInputs([new File([new Uint8Array(MAX_ZIP_BYTES + 1)], "big.zip")]), /100 MB/);
-  await assert.rejects(expandFitInputs([await zip(Array.from({ length: MAX_ZIP_ENTRIES + 1 }, (_, i) => [`${i}.txt`, data]))]), /1,000/);
+  await assert.rejects(expandFitInputs([archive], Array.from({ length: 1000 }, (_, i) => ({ name: `${i}.fit`, size: 1 }))), /1000 FIT/);
+  await assert.rejects(expandFitInputs([archive], [{ name: "old.fit", size: MAX_BATCH_BYTES }]), /1 GB/);
+  await assert.rejects(expandFitInputs([new File([new Uint8Array(MAX_ZIP_BYTES + 1)], "big.zip")]), /250 MB/);
+  await assert.rejects(expandFitInputs([await zip(Array.from({ length: MAX_ZIP_ENTRIES + 1 }, (_, i) => [`${i}.txt`, data]))]), /5,000/);
 });
 test("rejects oversized expanded FIT and checksum corruption", async () => {
   await assert.rejects(expandFitInputs([await zip([["big.fit", new Uint8Array(MAX_FIT_BYTES + 1)]])]), /20 MB/);

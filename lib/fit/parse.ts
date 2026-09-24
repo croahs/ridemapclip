@@ -1,9 +1,9 @@
 import { Decoder, Stream } from "@garmin/fitsdk";
 import { MAX_FIT_BYTES } from "./limits";
-import { distanceBetween, type Track, type TrackPoint } from "../track";
+import { distanceBetween, type Track } from "../track";
 
 import { movingTime } from "./moving-time";
-import type { FitWorkerResult } from "./types";
+import type { FitWorkerResult, TrackPoint } from "./types";
 
 export class FitError extends Error {}
 export class NoGpsFitError extends FitError {}
@@ -16,7 +16,7 @@ function finiteNumber(value: unknown): value is number {
 }
 
 export function parseFit(buffer: ArrayBuffer, name: string): Track {
-  if (buffer.byteLength > MAX_FIT_BYTES) throw new FitError("Choose a FIT file under 20 MB.");
+  if (buffer.byteLength > MAX_FIT_BYTES) throw new FitError("This FIT file is too large.");
   if (buffer.byteLength < 14) throw new FitError("This is not a complete FIT file. Export it again from your device.");
 
   let decoded: ReturnType<Decoder["read"]>;
@@ -60,8 +60,6 @@ export function parseFit(buffer: ArrayBuffer, name: string): Track {
     const point: TrackPoint = {
       latitude, longitude,
       timestamp: time === null ? null : new Date(time).toISOString(),
-      elevationMeters: finiteNumber(record.enhancedAltitude) ? record.enhancedAltitude :
-        finiteNumber(record.altitude) ? record.altitude : null,
       breakBefore,
     };
     if (previous && !breakBefore) distanceMeters += distanceBetween(previous, point);
@@ -88,7 +86,12 @@ export function parseFit(buffer: ArrayBuffer, name: string): Track {
   if (moving.seconds === null) warnings.push("Moving time could not be determined; this ride uses the full clip length.");
   return {
     movingSeconds: moving.seconds,
-    name, points, distanceMeters, skippedRecords, warnings,
+    name, distanceMeters, skippedRecords, warnings,
+    path: {
+      latitudes: Float64Array.from(points, point => point.latitude),
+      longitudes: Float64Array.from(points, point => point.longitude),
+      breaks: Uint8Array.from(points, point => point.breakBefore ? 1 : 0),
+    },
     elapsedSeconds: earliest !== null && latest !== null && latest > earliest ? (latest - earliest) / 1000 : null,
     startedAt: earliest === null ? null : new Date(earliest).toISOString(),
     endedAt: latest === null ? null : new Date(latest).toISOString(),

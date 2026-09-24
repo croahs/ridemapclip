@@ -1,15 +1,13 @@
-// Original samples and times; playback derives its own route (lib/clip/playback).
-export type TrackPoint = {
-  latitude: number;
-  longitude: number;
-  timestamp: string | null;
-  elevationMeters: number | null;
-  breakBefore: boolean;
-};
+/**
+ * A GPS path as parallel arrays (about 17 bytes per point): with up to 1000
+ * rides, one object per point would cost gigabytes. `breaks[i]` is 1 when a
+ * recording gap precedes point i.
+ */
+export type TrackPath = { latitudes: Float64Array; longitudes: Float64Array; breaks: Uint8Array };
 
 export type Track = {
   name: string;
-  points: TrackPoint[];
+  path: TrackPath;
   distanceMeters: number;
   elapsedSeconds: number | null;
   movingSeconds: number | null;
@@ -19,7 +17,9 @@ export type Track = {
   warnings: string[];
 };
 
-export function distanceBetween(a: TrackPoint, b: TrackPoint): number {
+type LatLon = { latitude: number; longitude: number };
+
+export function distanceBetween(a: LatLon, b: LatLon): number {
   const radians = Math.PI / 180;
   const dLat = (b.latitude - a.latitude) * radians;
   const dLon = (b.longitude - a.longitude) * radians;
