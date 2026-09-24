@@ -56,3 +56,20 @@ test("renders a large group without dropping output frames", async ({page}, test
   await page.getByRole("link", {name: "Download MP4"}).click();
   await (await downloaded).saveAs(testInfo.outputPath("large-group.mp4"));
 });
+
+test("the chosen clip length drives preview and video", async ({ page }) => {
+  await stubTiles(page);
+  await page.goto("/");
+  await page.locator('input[type="file"]').setInputFiles([rideFit("first.fit", 0, 600), rideFit("second.fit", 3, 900)]);
+  await page.getByRole("button", { name: "Create 2 tracks", exact: true }).click();
+  const length = page.getByLabel("Clip length in seconds", { exact: true });
+  await length.fill("9");
+  await length.press("Enter");
+  await expect(length).toHaveValue("15");
+  await expect(page.getByLabel("Playback time")).toHaveText("0:00 / 0:15");
+  await expect(page.getByText(/Finishes at 15s in the clip/)).toHaveCount(1);
+  await expect(page.getByText(/Finishes at 10s in the clip/)).toHaveCount(1);
+  await page.getByRole("button", { name: "Create video", exact: true }).click();
+  await expect(page.getByText("Your video is ready.")).toBeVisible({ timeout: 180000 });
+  await expect.poll(() => page.locator("video").evaluate(element => (element as HTMLVideoElement).duration)).toBe(15);
+});

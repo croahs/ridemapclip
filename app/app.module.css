@@ -191,6 +191,7 @@
 .mapTile { filter: var(--map-tile-filter); }
 .themeControl { display: flex; align-items: center; gap: 6px; color: #cbd5e1; }
 .themeControl .secondaryButton { padding: 6px 10px; }
+.lengthInput { width: 4.5em; padding: 5px 6px; border-radius: 8px; border: 1px solid #64748b; background: #1e293b; color: #f8fafc; }
 .themeButtonActive { background: #0369a1; border-color: #38bdf8; color: #fff; }
 
 

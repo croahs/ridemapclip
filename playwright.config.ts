@@ -5,7 +5,7 @@ export default defineConfig({
   timeout: 240000,
   forbidOnly: !!process.env.CI,
   globalTimeout: process.env.CI ? 10 * 60_000 : undefined,
-  reporter: process.env.CI ? "list" : "line",
+  reporter: process.env.CI ? [["list"], ["github"]] : "line",
   workers: 1,
   use: { channel: "chrome", headless: true, baseURL: "http://127.0.0.1:3100", viewport: { width: 1280, height: 1000 } },
   // Start Vite directly: through the pnpm wrapper the server can outlive the run on Linux and hang CI.

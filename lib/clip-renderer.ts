@@ -1,11 +1,9 @@
 import { createPlaybackRoute, playbackLocation, type PlaybackRoute } from "./playback";
 import { chronologicalTrailSlices } from "./trail-order";
-import { trackDurationsMs, trackProgress } from "./clip-timing";
 import { getTrackColor } from "./track-colors";
-import { riderAppearance } from "./video-timing";
 import { glowOpacityMultiplier, type MapTheme } from "./map-theme";
 import { formatRideElapsed } from "./format";
-import { CLIP_DURATION_MS } from "./clip";
+import { riderAppearance, trackDurationsMs, trackProgress } from "./clip";
 import type { Track } from "./track";
 
 export type Point = [number, number];
@@ -45,11 +43,12 @@ export type ClipView = { zoom: number; scale: number; dx: number; dy: number };
 type PixelRoute = { points: Point[]; source: number[]; sectionStart: boolean[] };
 
 type Rider = { route: PlaybackRoute; color: string; durationMs: number };
-export type ClipScene = { riders: Rider[]; large: boolean; longestSeconds: number; pixelRoutes: Map<string, PixelRoute[]> };
+export type ClipScene = { clipMs: number; riders: Rider[]; large: boolean; longestSeconds: number; pixelRoutes: Map<string, PixelRoute[]> };
 
-export function createScene(tracks: Track[]): ClipScene {
-  const durations = trackDurationsMs(tracks);
+export function createScene(tracks: Track[], clipMs: number): ClipScene {
+  const durations = trackDurationsMs(tracks, clipMs);
   return {
+    clipMs,
     riders: tracks.map((track, index) => ({ route: createPlaybackRoute(track.points), color: getTrackColor(index, tracks.length), durationMs: durations[index] })),
     large: tracks.length > CLIP_STYLE.largePackAbove,
     longestSeconds: Math.max(0, ...tracks.map(track => track.movingSeconds ?? 0)),
@@ -164,7 +163,7 @@ export function drawGlow(ctx: Context, scene: ClipScene, elapsedMs: number, them
   const routes = pixelRoutes(scene, view);
   const widthScale = (scene.large ? CLIP_STYLE.glowLargeScale : 1) * view.scale;
   scene.riders.forEach(({ route, durationMs }, rider) => {
-    const { glowOpacity } = riderAppearance(elapsedMs, durationMs);
+    const { glowOpacity } = riderAppearance(elapsedMs, durationMs, scene.clipMs);
     if (!glowOpacity) return;
     const { index, position } = playbackLocation(route, trackProgress(elapsedMs, durationMs));
     // Canvas lengths are Mercator lengths × scale, so the tail length needs no conversion.
@@ -178,7 +177,7 @@ export function drawGlow(ctx: Context, scene: ClipScene, elapsedMs: number, them
 /** Rider dots, above everything else. Returns their canvas positions (null when hidden). */
 export function drawRiders(ctx: Context, scene: ClipScene, elapsedMs: number, view: ClipView): (Point | null)[] {
   return scene.riders.map(({ route, color, durationMs }) => {
-    if (!riderAppearance(elapsedMs, durationMs).visible) return null;
+    if (!riderAppearance(elapsedMs, durationMs, scene.clipMs).visible) return null;
     const position = project(view, playbackLocation(route, trackProgress(elapsedMs, durationMs)).position);
     ctx.beginPath(); ctx.arc(...position, size(scene, CLIP_STYLE.riderRadius) * view.scale, 0, Math.PI * 2);
     ctx.fillStyle = color; ctx.fill();
@@ -195,7 +194,7 @@ export function drawOverlays(ctx: Context, scene: ClipScene, elapsedMs: number, 
     ctx.fillStyle = fill; ctx.fillRect(24 * unit, y * unit, ctx.measureText(text).width + 32 * unit, boxHeight * unit);
     ctx.fillStyle = "white"; ctx.fillText(text, 40 * unit, (y + baseline) * unit);
   };
-  const time = formatRideElapsed(scene.longestSeconds > 0 ? scene.longestSeconds * elapsedMs / CLIP_DURATION_MS : null, scene.longestSeconds >= 3600);
+  const time = formatRideElapsed(scene.longestSeconds > 0 ? scene.longestSeconds * elapsedMs / scene.clipMs : null, scene.longestSeconds >= 3600);
   box(time, `bold ${32 * unit}px Arial`, 24, 52, 37, "#0f172acc");
   box(CLIP_STYLE.watermark, `bold ${18 * unit}px Arial`, 88, 36, 24, "#0f172a99");
   if (!attribution) return;

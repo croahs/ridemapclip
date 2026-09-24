@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { formatDigitalTime, formatHumanDuration, formatRideElapsed } from "../lib/format";
-import { currentTrackElapsedSeconds } from "../lib/clip-timing";
+import { formatClipTime, formatDigitalTime, formatHumanDuration, formatRideElapsed } from "../lib/format";
+import { currentTrackElapsedSeconds } from "../lib/clip";
 
 test("formats digital times under an hour as MM:SS", () => {
   assert.equal(formatDigitalTime(0), "00:00");
@@ -67,4 +67,11 @@ test("formatRideElapsed formats hours and minutes as a single clean number", () 
   assert.equal(formatRideElapsed(null), "--");
   assert.equal(formatRideElapsed(-50), "--");
   assert.equal(formatRideElapsed(NaN), "--");
+});
+
+test("clip positions read as m:ss", () => {
+  assert.equal(formatClipTime(0), "0:00");
+  assert.equal(formatClipTime(7.9), "0:07");
+  assert.equal(formatClipTime(105), "1:45");
+  assert.equal(formatClipTime(120), "2:00");
 });

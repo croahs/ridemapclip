@@ -1,38 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { CLIP_DURATION_MS, CLIP_DURATION_SECONDS, ClipClock } from "../lib/clip";
 import { createPlaybackRoute, playbackPosition, playbackSlice } from "../lib/playback";
 import { pixelRoute, pixelTail } from "../lib/clip-renderer";
 import type { TrackPoint } from "../lib/track";
 import { chronologicalTrailSlices } from "../lib/trail-order";
 
 const point = (longitude: number, breakBefore = false): TrackPoint => ({ latitude: 0, longitude, timestamp: null, elevationMeters: null, breakBefore });
-
-test("clip duration is locked at exactly 30 seconds, including late frames", () => {
-  assert.equal(CLIP_DURATION_SECONDS, 30);
-  assert.equal(CLIP_DURATION_MS, 30_000);
-  const clock = new ClipClock();
-  clock.play(100);
-  assert.equal(clock.elapsed(100), 0);
-  assert.equal(clock.elapsed(15_100), 15_000);
-  assert.equal(clock.elapsed(30_100), 30_000);
-  assert.equal(clock.elapsed(50_100), 30_000);
-});
-
-test("pause/resume preserves remaining duration; replay starts from zero", () => {
-  const clock = new ClipClock();
-  clock.play(0);
-  clock.pause(10_000);
-  assert.equal(clock.elapsed(60_000), 10_000);
-  clock.play(60_000);
-  clock.play(61_000);
-  assert.equal(clock.elapsed(80_000), 30_000);
-  clock.pause(80_000);
-  clock.play(90_000);
-  assert.equal(clock.elapsed(90_000), 0);
-  clock.reset();
-  assert.equal(clock.elapsed(100_000), 0);
-});
 
 test("progress uses distance, not sample count, and ends exactly at the finish", () => {
   const route = createPlaybackRoute([point(0), point(0.001), point(0.01)]);

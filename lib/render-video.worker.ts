@@ -1,6 +1,6 @@
 import { BufferTarget, CanvasSource, Mp4OutputFormat, Output, Quality, canEncodeVideo } from "mediabunny";
 import { CLIP_STYLE, createScene, drawGlow, drawOverlays, drawRiders, drawTrails } from "./clip-renderer";
-import { VIDEO_FRAMES, VIDEO_FPS, videoFrameTiming } from "./video-timing";
+import { VIDEO_FPS, videoFrameCount, videoFrameTiming } from "./clip";
 import type { RenderRequest, RenderMessage } from "./render-video-types";
 
 const post = (message: RenderMessage, transfer: Transferable[] = []) => self.postMessage(message, { transfer });
@@ -11,12 +11,13 @@ function context(canvas: OffscreenCanvas) {
   return result;
 }
 
-async function render({ tracks, theme, width, height, background, view, frame }: RenderRequest) {
+async function render({ tracks, clipMs, theme, width, height, background, view, frame }: RenderRequest) {
   const quality = new Quality({ bitrate: 8_000_000 });
   if (!(await canEncodeVideo("avc", { width, height, quality }))) {
     throw new Error("This browser cannot create MP4 videos. Open the app in an up-to-date Chrome or Edge browser and try again.");
   }
-  const scene = createScene(tracks);
+  const scene = createScene(tracks, clipMs);
+  const frames = videoFrameCount(clipMs);
   const clip = (ctx: OffscreenCanvasRenderingContext2D) => {
     ctx.beginPath(); ctx.rect(frame.x, frame.y, frame.width, frame.height); ctx.clip();
   };
@@ -33,8 +34,8 @@ async function render({ tracks, theme, width, height, background, view, frame }:
   const source = new CanvasSource(surface, { codec: "avc", quality, keyFrameInterval: 2 });
   output.addVideoTrack(source, { frameRate: VIDEO_FPS });
   await output.start();
-  for (let index = 0; index < VIDEO_FRAMES; index++) {
-    const { elapsedMs, timestamp, duration } = videoFrameTiming(index);
+  for (let index = 0; index < frames; index++) {
+    const { elapsedMs, timestamp, duration } = videoFrameTiming(index, clipMs);
     ctx.drawImage(background, 0, 0);
     ctx.save();
     clip(ctx);
@@ -52,7 +53,7 @@ async function render({ tracks, theme, width, height, background, view, frame }:
     ctx.restore();
     drawOverlays(ctx, scene, elapsedMs, width, height, true);
     await source.add(timestamp, duration);
-    post({ type: "progress", fraction: (index + 1) / VIDEO_FRAMES * 0.98, message: `Rendering video… ${Math.round((index + 1) / VIDEO_FRAMES * 100)}%` });
+    post({ type: "progress", fraction: (index + 1) / frames * 0.98, message: `Rendering video… ${Math.round((index + 1) / frames * 100)}%` });
   }
   post({ type: "progress", fraction: 0.99, message: "Finishing your MP4…" });
   source.close();

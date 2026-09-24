@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { Encoder, Profile } from "@garmin/fitsdk";
 import { movingTime } from "../lib/moving-time";
 import { parseFit } from "../lib/parse-fit";
-import { trackDurationsMs } from "../lib/clip-timing";
+import { trackDurationsMs } from "../lib/clip";
 import type { TrackPoint } from "../lib/track";
 const send = (encoder: Encoder, number: number, message: Record<string, unknown>) => encoder.onMesg(number, message);
 const start = Date.parse("2026-09-15T08:00:00Z");
@@ -30,7 +30,7 @@ test("GPS fallback excludes stationary fixes, drift and recording gaps", () => {
 test("missing timing remains unknown", () => {
   assert.equal(movingTime([{...point(0), timestamp: null}, {...point(10), timestamp: null}], [null, null], [], []).seconds, null);
 });
-test("binary FIT parsing carries moving time through to 30-second normalization", () => {
+test("binary FIT parsing carries moving time through to clip normalization", () => {
   const encoder = new Encoder();
   send(encoder, Profile.MesgNum.FILE_ID, {type: "activity", manufacturer: "development", timeCreated: date(0)});
   for (const seconds of [0, 10, 20]) send(encoder, Profile.MesgNum.RECORD, {
@@ -40,7 +40,7 @@ test("binary FIT parsing carries moving time through to 30-second normalization"
   const track = parseFit(new Uint8Array(encoder.close()).buffer, "paused.fit");
   assert.equal(track.elapsedSeconds, 20);
   assert.equal(track.movingSeconds, 10);
-  assert.deepEqual(trackDurationsMs([track, {movingSeconds: 20}]), [15000, 30000]);
+  assert.deepEqual(trackDurationsMs([track, {movingSeconds: 20}], 30_000), [15000, 30000]);
 });
 test("binary FIT timer events exclude stopped time when no moving summary exists", () => {
   const encoder = new Encoder();

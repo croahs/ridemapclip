@@ -85,7 +85,7 @@ export function parseFit(buffer: ArrayBuffer, name: string): Track {
   if (points.some((point) => point.timestamp === null)) warnings.push("Some GPS points have no timestamp; timed playback may be limited.");
   const moving = movingTime(points, speeds, decoded.messages.eventMesgs ?? [], decoded.messages.sessionMesgs ?? []);
   if (moving.estimated && moving.seconds !== null) warnings.push("Moving time estimated from recorded speed or GPS movement, excluding timer pauses and recording gaps.");
-  if (moving.seconds === null) warnings.push("Moving time could not be determined; this ride uses the full 30-second preview.");
+  if (moving.seconds === null) warnings.push("Moving time could not be determined; this ride uses the full clip length.");
   return {
     movingSeconds: moving.seconds,
     name, points, distanceMeters, skippedRecords, warnings,

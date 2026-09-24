@@ -6,8 +6,8 @@ import type { MapTheme } from "@/lib/map-theme";
 import { VIDEO_FORMATS, type VideoFormat } from "@/lib/video-format";
 import styles from "./app.module.css";
 
-export default function VideoExport({ tracks, mapTheme, videoFormat, getMap, pausePreview, onBusy }: {
-  tracks: Track[]; mapTheme: MapTheme; videoFormat: VideoFormat; getMap: () => L.Map | null; pausePreview: () => void; onBusy: (busy: boolean) => void;
+export default function VideoExport({ tracks, clipMs, mapTheme, videoFormat, getMap, pausePreview, onBusy }: {
+  tracks: Track[]; clipMs: number; mapTheme: MapTheme; videoFormat: VideoFormat; getMap: () => L.Map | null; pausePreview: () => void; onBusy: (busy: boolean) => void;
 }) {
   const [progress, setProgress] = useState<VideoProgress | null>(null);
   const [error, setError] = useState("");
@@ -33,7 +33,7 @@ export default function VideoExport({ tracks, mapTheme, videoFormat, getMap, pau
     handlers.forEach(handler => handler.disable());
     try {
       const { renderVideo } = await import("@/lib/render-video");
-      const blob = await renderVideo(map, tracks, mapTheme, videoFormat, task.signal, value => { if (!task.signal.aborted) setProgress(value); });
+      const blob = await renderVideo(map, tracks, clipMs, mapTheme, videoFormat, task.signal, value => { if (!task.signal.aborted) setProgress(value); });
       if (task.signal.aborted) return;
       const next = URL.createObjectURL(blob);
       if (url.current) URL.revokeObjectURL(url.current);
@@ -54,7 +54,7 @@ export default function VideoExport({ tracks, mapTheme, videoFormat, getMap, pau
       <a className={styles.secondaryButton} href={video} download="ridemapclip.mp4">Download MP4</a>
       <p className={styles.hint}>This video uses the map position from when you clicked Create video. Reposition the map and create another video to change it.</p>
     </div>}
-    <p className={styles.hint}>Position the map above, then create a smooth {VIDEO_FORMATS[videoFormat].label} 30-second video. 30 fps · MP4. Keep this tab open while it renders.</p>
+    <p className={styles.hint}>Position the map above, then create a smooth {VIDEO_FORMATS[videoFormat].label} {clipMs / 1000}-second video. 30 fps · MP4. Keep this tab open while it renders.</p>
     <button className={styles.primaryButton} type="button" disabled={progress !== null} onClick={createVideo}>{progress ? "Creating video…" : "Create video"}</button>
     {progress && <div>
       <p className={styles.hint} role="status">{progress.message}</p>

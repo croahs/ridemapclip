@@ -52,7 +52,7 @@ async function capture(map: L.Map, theme: MapTheme, width: number, height: numbe
  * Renders the clip into an MP4 in a worker, so a hidden tab or a busy page
  * does not slow it down. Aborting terminates the worker immediately.
  */
-export async function renderVideo(map: L.Map, tracks: Track[], theme: MapTheme, format: VideoFormat, signal: AbortSignal, progress: (value: VideoProgress) => void): Promise<Blob> {
+export async function renderVideo(map: L.Map, tracks: Track[], clipMs: number, theme: MapTheme, format: VideoFormat, signal: AbortSignal, progress: (value: VideoProgress) => void): Promise<Blob> {
   const { width, height } = VIDEO_FORMATS[format];
   progress({ fraction: 0, message: "Preparing your map…" });
   const { background, view, frame } = await capture(map, theme, width, height, signal);
@@ -71,7 +71,7 @@ export async function renderVideo(map: L.Map, tracks: Track[], theme: MapTheme, 
         }
       };
       worker.onerror = () => reject(new Error("The video renderer stopped unexpectedly. Please try again."));
-      const request: RenderRequest = { tracks, theme, width, height, background, view, frame };
+      const request: RenderRequest = { tracks, clipMs, theme, width, height, background, view, frame };
       worker.postMessage(request, [background]);
     });
   } finally {

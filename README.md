@@ -37,18 +37,11 @@ return to the full track. The colored moving markers show playback position.
 
 Users paste their personal API key from Intervals.icu Settings → Developer Settings and select Import latest 100. The browser calls the Intervals.icu API directly with Basic authentication; the key never reaches a RideMapClip server (there is none) and is not persisted. The form clears immediately. Athlete ID 0 identifies the key owner, so no athlete ID is needed. No environment variables are required. An earlier OAuth implementation is preserved at the git tag `parked/oauth`.
 
-## Animation and fixed clip duration
+## Animation and clip length
 
-Select **Play animation** to reveal the track with one moving rider marker per track. All tracks start together. The longest moving duration maps to 30 seconds; shorter rides finish proportionally earlier and remain visible. For example, a one-hour ride finishes at 15 seconds alongside a two-hour ride. Missing durations use the full 30 seconds, with a notice.
-Every clip is fixed at **30 seconds**, for the whole clip, regardless of ride distance. Movement follows GPS distance at a steady pace, not the original ride's
-speed. Missing GPS sections remain disconnected. Use Pause/Resume, Restart, or
-Replay; leaving the tab pauses playback. Animation starts only when requested. The Fullscreen button expands the map and playback controls together; use Exit fullscreen or Escape to return.
+Choose a clip length from 15 to 120 seconds (30 by default) with the slider or the number field. Select **Play animation** to reveal the tracks with one moving rider per track. All tracks start together. The longest moving time finishes at the end of the clip; shorter rides finish proportionally earlier and stay visible. For example, in a 30-second clip a one-hour ride finishes at 15 seconds alongside a two-hour ride. Rides without a moving time use the full clip, with a notice. Movement follows GPS distance at a steady pace, not the original ride's speed. Missing GPS sections remain disconnected. Use Pause/Resume, Restart or Replay; leaving the tab pauses playback. Fullscreen expands the map and playback controls together.
 
-`lib/clip.ts` owns the duration rule. Future video exports must use that same
-30-second duration. There are no speed or duration settings until the user
-explicitly requests them. Create video renders 900 frames into a 30-second 1920×1080 H.264 MP4 in your browser. Position the map first; the view is captured when rendering begins. The result plays in-browser and can be downloaded. Chrome/Edge with H.264 WebCodecs encoding are supported; unsupported browsers show an error. Cancel stops rendering. Only loaded map tiles are captured, with OpenStreetMap attribution included. The video stays in browser memory until downloaded or the page is closed. Rendering speed depends on the computer and number of rides.
-
-The final glow fades before each ride finishes, including inside the final 30-second boundary.
+The preview is drawn by the same renderer as the video (`lib/clip-renderer.ts`), so what you see is what you get. **Create video** renders an H.264 MP4 at 30 fps in the chosen format (16:9, 1:1 or 9:16) in a background worker, so a hidden tab does not slow it down. Position the map first; the view is captured when rendering begins. Only loaded map tiles are captured, with OpenStreetMap attribution included. Chrome and Edge are supported; browsers without H.264 WebCodecs encoding show an error. The video stays in browser memory until downloaded or the page is closed. On a desktop machine, 200 one-hour rides take about 20 seconds for a 30-second clip and about 70 seconds (roughly 120 MB) for a 120-second clip (`PERF=1 pnpm test:browser export-perf`).
 
 ## Validation
 
@@ -71,7 +64,9 @@ because device exports vary.
 - `lib/track.ts`: independent track model and geometry helpers.
 - `lib/read-fit-files.ts` and `lib/fit.worker.ts`: local file processing and progress, using the shared FIT parser.
 - `lib/intervals.ts`: bounded Intervals.icu requests and activity import, run in the browser.
-- `app/track-map.tsx`: client-only map, markers, and cleanup.
+- `lib/clip.ts`: clip length, playback clock, ride timing and video frame timing.
+- `lib/clip-renderer.ts`: draws trails, glow, riders and overlays for both preview and video; `lib/render-video*.ts` capture the map and encode the MP4 in a worker.
+- `app/track-map.tsx`: map, preview canvases and playback controls.
 - `app/app.tsx`: multi-file workflow; `app/main.tsx` and `index.html` are the entry points.
 
 The background map is for interactive local previews. Review the tile provider

@@ -1,22 +1,23 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { CLIP_DURATION_MS, CLIP_DURATION_SECONDS, ClipClock } from "@/lib/clip";
+import { ClipClock, currentTrackElapsedSeconds, trackDurationsMs, videoFrameCount } from "@/lib/clip";
 import { CLIP_STYLE, createScene, drawGlow, drawOverlays, drawRiders, drawTrails, type ClipView, type Point } from "@/lib/clip-renderer";
 import { getTrackColor } from "@/lib/track-colors";
-import { trackDurationsMs, currentTrackElapsedSeconds } from "@/lib/clip-timing";
-import { formatDigitalTime } from "@/lib/format";
-import { VIDEO_FRAMES } from "@/lib/video-timing";
+import { formatClipTime, formatDigitalTime } from "@/lib/format";
 import { mapTileFilter, type MapTheme } from "@/lib/map-theme";
 import { VIDEO_FORMATS, type VideoFormat } from "@/lib/video-format";
 import type { Track } from "@/lib/track";
 import VideoExport from "./video-export";
+import ClipLength from "./clip-length";
 import styles from "./app.module.css";
 
 type PlaybackState = "ready" | "playing" | "paused" | "finished";
-type Controls = { play: () => void; pause: () => void; replay: () => void; repaint: () => void };
+type Controls = { play: () => void; pause: () => void; replay: () => void; repaint: () => void; setClipMs: (clipMs: number) => void };
 
-export default function TrackMap({ tracks }: { tracks: Track[] }) {
+export default function TrackMap({ tracks, clipSeconds, onClipSecondsChange }: { tracks: Track[]; clipSeconds: number; onClipSecondsChange: (seconds: number) => void }) {
+  const clipMs = clipSeconds * 1000;
+  const clipMsRef = useRef(clipMs);
   const [rendering, setRendering] = useState(false);
   const [mapTheme, setMapTheme] = useState<MapTheme>("dark");
   const [videoFormat, setVideoFormat] = useState<VideoFormat>("landscape");
@@ -25,7 +26,7 @@ export default function TrackMap({ tracks }: { tracks: Track[] }) {
   const [fullscreen, setFullscreen] = useState(false);
   const [fullscreenError, setFullscreenError] = useState("");
   const [showRiderList, setShowRiderList] = useState(false);
-  const durations = useMemo(() => trackDurationsMs(tracks), [tracks]);
+  const durations = useMemo(() => trackDurationsMs(tracks, clipMs), [tracks, clipMs]);
   const hasHourRides = useMemo(() => tracks.some((t) => (t.movingSeconds ?? 0) >= 3600), [tracks]);
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -35,6 +36,11 @@ export default function TrackMap({ tracks }: { tracks: Track[] }) {
   const [tileError, setTileError] = useState(false);
   const [status, setStatus] = useState<PlaybackState>("ready");
   const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    clipMsRef.current = clipMs;
+    controls.current?.setClipMs(clipMs);
+  }, [clipMs]);
 
   useEffect(() => {
     mapThemeRef.current = mapTheme;
@@ -117,7 +123,7 @@ export default function TrackMap({ tracks }: { tracks: Track[] }) {
     tiles.on("tileerror", () => setTileError(true));
 
     // The preview draws with the same functions as the video export (lib/clip-renderer).
-    const scene = createScene(tracks);
+    let scene = createScene(tracks, clipMsRef.current);
     const layer = (pane: string, zIndex: number, className: string) => {
       const element = map.createPane(pane);
       element.style.zIndex = String(zIndex);
@@ -171,16 +177,16 @@ export default function TrackMap({ tracks }: { tracks: Track[] }) {
     }
 
     // Trails are drawn in the same steps as video frames, so overlaps stack identically.
-    const trailStepMs = CLIP_DURATION_MS / (VIDEO_FRAMES - 1);
+    let trailStepMs = scene.clipMs / (videoFrameCount(scene.clipMs) - 1);
     let trailElapsedMs = 0;
     function advanceTrails(milliseconds: number) {
       while (trailElapsedMs + trailStepMs <= milliseconds) {
         drawTrails(trails.ctx, scene, trailElapsedMs, trailElapsedMs + trailStepMs, view);
         trailElapsedMs += trailStepMs;
       }
-      if (milliseconds >= CLIP_DURATION_MS && trailElapsedMs < CLIP_DURATION_MS) {
-        drawTrails(trails.ctx, scene, trailElapsedMs, CLIP_DURATION_MS, view);
-        trailElapsedMs = CLIP_DURATION_MS;
+      if (milliseconds >= scene.clipMs && trailElapsedMs < scene.clipMs) {
+        drawTrails(trails.ctx, scene, trailElapsedMs, scene.clipMs, view);
+        trailElapsedMs = scene.clipMs;
       }
     }
     function clearTrails() {
@@ -188,7 +194,7 @@ export default function TrackMap({ tracks }: { tracks: Track[] }) {
       trailElapsedMs = 0;
     }
 
-    const clock = new ClipClock();
+    let clock = new ClipClock(scene.clipMs);
     let frameId: number | null = null;
     let running = false;
     let lastUiUpdate = -Infinity;
@@ -236,11 +242,11 @@ export default function TrackMap({ tracks }: { tracks: Track[] }) {
       if (!running) return;
       const milliseconds = clock.elapsed(now);
       paint(milliseconds);
-      if (now - lastUiUpdate >= 100 || milliseconds === CLIP_DURATION_MS) {
+      if (now - lastUiUpdate >= 100 || milliseconds === scene.clipMs) {
         setElapsed(milliseconds);
         lastUiUpdate = now;
       }
-      if (milliseconds >= CLIP_DURATION_MS) {
+      if (milliseconds >= scene.clipMs) {
         clock.pause(now);
         running = false;
         frameId = null;
@@ -259,14 +265,14 @@ export default function TrackMap({ tracks }: { tracks: Track[] }) {
       const milliseconds = clock.elapsed(performance.now());
       paint(milliseconds);
       setElapsed(milliseconds);
-      setStatus(milliseconds === CLIP_DURATION_MS ? "finished" : "paused");
+      setStatus(milliseconds === scene.clipMs ? "finished" : "paused");
     }
 
     function play() {
       if (running) return;
       const now = performance.now();
       // Replaying a finished clip starts from an empty map.
-      if (clock.elapsed(now) >= CLIP_DURATION_MS) clearTrails();
+      if (clock.elapsed(now) >= scene.clipMs) clearTrails();
       clock.play(now);
       const milliseconds = clock.elapsed(now);
       paint(milliseconds);
@@ -285,6 +291,18 @@ export default function TrackMap({ tracks }: { tracks: Track[] }) {
         play();
       },
       repaint: () => paint(clock.elapsed(performance.now())),
+      // A new clip length restarts playback from an empty map; the map view is kept.
+      setClipMs: (next: number) => {
+        if (next === scene.clipMs) return;
+        pause();
+        scene = createScene(tracks, next);
+        trailStepMs = scene.clipMs / (videoFrameCount(scene.clipMs) - 1);
+        clock = new ClipClock(scene.clipMs);
+        clearTrails();
+        paint(0);
+        setElapsed(0);
+        setStatus("ready");
+      },
     };
     // Hidden tabs stop requesting frames. Pause explicitly rather than skipping
     // ahead when the user returns to their preview.
@@ -312,9 +330,9 @@ export default function TrackMap({ tracks }: { tracks: Track[] }) {
       onMouseEnter={onUserActivity}
       onClick={onUserActivity}
     >
-      <VideoExport tracks={tracks} mapTheme={mapTheme} videoFormat={videoFormat} getMap={() => mapRef.current} pausePreview={() => controls.current?.pause()} onBusy={setRendering} />
+      <VideoExport tracks={tracks} clipMs={clipMs} mapTheme={mapTheme} videoFormat={videoFormat} getMap={() => mapRef.current} pausePreview={() => controls.current?.pause()} onBusy={setRendering} />
       <div className={styles.playbackPanel}>
-        <div className={styles.playbackHeading}><h3>Track animation</h3><span>{CLIP_DURATION_SECONDS}-second clip</span></div>
+        <div className={styles.playbackHeading}><h3>Track animation</h3><span>{clipSeconds}-second clip</span></div>
         <div className={styles.playbackControls}>
           <button type="button" className={styles.secondaryButton} disabled={rendering} onClick={() => {
             if (status === "playing") controls.current?.pause();
@@ -322,9 +340,9 @@ export default function TrackMap({ tracks }: { tracks: Track[] }) {
           }}>{status === "playing" ? "Pause" : status === "paused" ? "Resume" : status === "finished" ? "Replay" : "Play animation"}</button>
           {(status === "playing" || status === "paused") && <button type="button" className={styles.secondaryButton} disabled={rendering} onClick={() => controls.current?.replay()}>Restart</button>}
           <button type="button" className={styles.secondaryButton} disabled={rendering} onClick={toggleFullscreen}>{fullscreen ? "Exit fullscreen" : "Fullscreen"}</button>
-          <span className={styles.playbackTime} aria-label="Playback time">0:{String(Math.floor(elapsed / 1000)).padStart(2, "0")} / 0:{CLIP_DURATION_SECONDS}</span>
+          <span className={styles.playbackTime} aria-label="Playback time">{formatClipTime(elapsed / 1000)} / {formatClipTime(clipSeconds)}</span>
         </div>
-        <progress className={styles.playbackProgress} value={elapsed} max={CLIP_DURATION_MS} aria-label="Clip progress" />
+        <progress className={styles.playbackProgress} value={elapsed} max={clipMs} aria-label="Clip progress" />
         {tracks.length > 5 ? (
           <div className={styles.packTelemetryBar}>
             <div className={styles.packTelemetryStats}>
@@ -380,12 +398,13 @@ export default function TrackMap({ tracks }: { tracks: Track[] }) {
             })}
           </div>
         )}
-        <p className={styles.hint} role="status">{status === "finished" ? "Animation complete." : status === "paused" ? "Paused. Resume to continue from here." : status === "playing" ? "Playing your 30-second route preview." : "The longest moving time becomes 30 seconds. Shorter rides finish proportionally earlier."}</p>
+        <p className={styles.hint} role="status">{status === "finished" ? "Animation complete." : status === "paused" ? "Paused. Resume to continue from here." : status === "playing" ? `Playing your ${clipSeconds}-second route preview.` : `The longest moving time becomes ${clipSeconds} seconds. Shorter rides finish proportionally earlier.`}</p>
       </div>
       {fullscreenError && <p className={styles.error} role="alert">{fullscreenError}</p>}
-      {tracks.some((track) => !track.movingSeconds || track.movingSeconds <= 0) && <p className={styles.hint}>Rides without a moving time use the full 30 seconds.</p>}
+      {tracks.some((track) => !track.movingSeconds || track.movingSeconds <= 0) && <p className={styles.hint}>Rides without a moving time use the full clip length.</p>}
       <div className={styles.mapToolbar}>
         <div className={styles.mapOptions}>
+          <ClipLength seconds={clipSeconds} disabled={rendering} onChange={onClipSecondsChange} />
           <div className={styles.themeControl} role="group" aria-label="Map theme">
             <span>Map</span>
             {(["dark", "light"] as const).map((theme) => (

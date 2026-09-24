@@ -20,6 +20,12 @@ export function formatDigitalTime(seconds: number | null, alwaysShowHours = fals
   return `${mm}:${ss}`;
 }
 
+/** Clip position as m:ss (e.g. "0:07" or "1:45"). */
+export function formatClipTime(seconds: number): string {
+  const total = Math.max(0, Math.floor(seconds));
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+}
+
 /**
  * Human-readable duration format (e.g., "1h 45m" or "25m 30s").
  */
