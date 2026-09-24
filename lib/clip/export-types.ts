@@ -1,6 +1,6 @@
 import type { MapTheme } from "./map-theme";
-import type { ClipView } from "./clip-renderer";
-import type { Track } from "./track";
+import type { ClipView } from "./renderer";
+import type { Track } from "../track";
 
 /** Where the captured map sits inside the video frame, in video pixels. */
 export type MapFrame = { x: number; y: number; width: number; height: number };

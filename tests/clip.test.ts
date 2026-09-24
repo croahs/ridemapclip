@@ -3,8 +3,8 @@ import { test } from "node:test";
 import {
   CLIP_SECONDS, ClipClock, VIDEO_FPS, clampClipSeconds, riderAppearance,
   trackDurationsMs, trackProgress, videoFrameCount, videoFrameTiming,
-} from "../lib/clip";
-import { VIDEO_FORMATS } from "../lib/video-format";
+} from "../lib/clip/timing";
+import { VIDEO_FORMATS } from "../lib/clip/video-format";
 
 test("clip length is chosen between 15 and 120 seconds, 30 by default", () => {
   assert.deepEqual(CLIP_SECONDS, { min: 15, max: 120, default: 30 });

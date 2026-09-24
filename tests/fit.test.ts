@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Encoder, Profile, type FileIdMesg } from "@garmin/fitsdk";
-import { parseFit, readFit } from "../lib/parse-fit";
-import { MAX_FIT_BYTES, MAX_BATCH_BYTES, validateFitBatch, validateFitFile } from "../lib/fit";
-import { mapSegments } from "../lib/track";
+import { parseFit, readFit } from "../lib/fit/parse";
+import { MAX_FIT_BYTES, MAX_BATCH_BYTES, validateFitBatch, validateFitFile } from "../lib/fit/limits";
+import { createPlaybackRoute } from "../lib/clip/playback";
 
 const start = new Date("2026-09-15T08:00:00Z");
 const semicircles = (degrees: number) => Math.round(degrees * 2 ** 31 / 180);
@@ -61,7 +61,7 @@ test("missing GPS and long gaps split the track and exclude invented distance", 
   assert.equal(track.skippedRecords, 1);
   assert.deepEqual(track.points.map((p) => p.breakBefore), [false, true, true]);
   assert.equal(track.distanceMeters, 0);
-  assert.equal(mapSegments(track.points).length, 3);
+  assert.equal(createPlaybackRoute(track.points).breaks.filter(Boolean).length + 1, 3);
 });
 
 test("missing timestamps remain missing and do not become fabricated dates", () => {
@@ -73,8 +73,8 @@ test("missing timestamps remain missing and do not become fabricated dates", () 
 
 test("dateline crossings stay local in the map and distance calculation", () => {
   const track = parseFit(recording([point(0, 179.999, 0), point(0, -179.999, 10)]), "dateline.fit");
-  const segment = mapSegments(track.points)[0];
-  assert.ok(Math.abs(segment[1][1] - segment[0][1]) < 0.003);
+  const [start, end] = createPlaybackRoute(track.points).coordinates;
+  assert.ok(Math.abs(end[1] - start[1]) < 0.003);
   assert.ok(track.distanceMeters > 220 && track.distanceMeters < 225);
 });
 

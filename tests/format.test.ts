@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { formatClipTime, formatDigitalTime, formatHumanDuration, formatRideElapsed } from "../lib/format";
-import { currentTrackElapsedSeconds } from "../lib/clip";
+import { currentTrackElapsedSeconds } from "../lib/clip/timing";
 
 test("formats digital times under an hour as MM:SS", () => {
   assert.equal(formatDigitalTime(0), "00:00");

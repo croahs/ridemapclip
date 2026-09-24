@@ -1,5 +1,5 @@
 import { BlobReader, ZipReader, configure } from "@zip.js/zip.js";
-import { MAX_BATCH_BYTES, MAX_FIT_BYTES, MAX_FIT_FILES, validateFitBatch, validateFitFile } from "./fit";
+import { MAX_BATCH_BYTES, MAX_FIT_BYTES, MAX_FIT_FILES, validateFitBatch, validateFitFile } from "./limits";
 
 export const MAX_ZIP_BYTES = 100 * 1024 * 1024;
 export const MAX_ZIP_ENTRIES = 1000;

@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Encoder, Profile } from "@garmin/fitsdk";
-import { movingTime } from "../lib/moving-time";
-import { parseFit } from "../lib/parse-fit";
-import { trackDurationsMs } from "../lib/clip";
+import { movingTime } from "../lib/fit/moving-time";
+import { parseFit } from "../lib/fit/parse";
+import { trackDurationsMs } from "../lib/clip/timing";
 import type { TrackPoint } from "../lib/track";
 const send = (encoder: Encoder, number: number, message: Record<string, unknown>) => encoder.onMesg(number, message);
 const start = Date.parse("2026-09-15T08:00:00Z");

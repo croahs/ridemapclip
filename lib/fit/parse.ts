@@ -1,9 +1,9 @@
 import { Decoder, Stream } from "@garmin/fitsdk";
-import { MAX_FIT_BYTES } from "./fit";
-import { distanceBetween, type Track, type TrackPoint } from "./track";
+import { MAX_FIT_BYTES } from "./limits";
+import { distanceBetween, type Track, type TrackPoint } from "../track";
 
 import { movingTime } from "./moving-time";
-import type { FitWorkerResult } from "./fit-worker-types";
+import type { FitWorkerResult } from "./types";
 
 export class FitError extends Error {}
 export class NoGpsFitError extends FitError {}

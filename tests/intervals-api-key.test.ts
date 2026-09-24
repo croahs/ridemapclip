@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { gzipSync } from "node:zlib";
 import { Encoder, Profile, type FileIdMesg, type RecordMesg } from "@garmin/fitsdk";
 import { importLatestActivities, type ImportProgress } from "../lib/intervals";
-import { readFit } from "../lib/parse-fit";
+import { readFit } from "../lib/fit/parse";
 
 const parse = async (buffer: ArrayBuffer, name: string) => readFit(buffer, name);
 

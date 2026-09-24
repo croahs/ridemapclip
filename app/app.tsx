@@ -1,10 +1,11 @@
 import { lazy, Suspense, useEffect, useRef, useState, type CSSProperties } from "react";
-import { MAX_FIT_FILES, validateFitBatch } from "@/lib/fit";
-import { getTrackColor } from "@/lib/track-colors";
-import { CLIP_SECONDS, trackDurationsMs } from "@/lib/clip";
+import { MAX_FIT_FILES, validateFitBatch } from "@/lib/fit/limits";
+import { getTrackColor } from "@/lib/clip/track-colors";
+import { CLIP_SECONDS, trackDurationsMs } from "@/lib/clip/timing";
 import { formatHumanDuration } from "@/lib/format";
 import type { Track } from "@/lib/track";
 import type { ImportProgress } from "@/lib/intervals";
+import IntervalsCard from "./intervals-card";
 import styles from "./app.module.css";
 
 const TrackMap = lazy(() => import("./track-map"));
@@ -17,7 +18,6 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
   const [importProgress, setImportProgress] = useState<ImportProgress | null>(null);
-  const [apiKey, setApiKey] = useState("");
   const [dragging, setDragging] = useState(false);
   const [clipSeconds, setClipSeconds] = useState<number>(CLIP_SECONDS.default);
 
@@ -32,7 +32,7 @@ export default function App() {
     try {
     let expanded = incoming;
     if (incoming.some(file => /\.zip$/i.test(file.name))) {
-      const { readFitInputs } = await import("@/lib/read-fit-inputs");
+      const { readFitInputs } = await import("@/lib/fit/read-zips");
       const result = await readFitInputs(incoming, files);
       expanded = result.files;
       if (result.ignored) setArchiveNotice("Ignored " + result.ignored + " non-FIT archive file(s).");
@@ -60,7 +60,7 @@ export default function App() {
     setUploadProgress({ current: 0, total: files.length });
 
     try {
-      const { readFitFiles } = await import("@/lib/read-fit-files");
+      const { readFitFiles } = await import("@/lib/fit/read-files");
       const result = await readFitFiles(files, current => setUploadProgress({ current, total: files.length }));
       setTracks(result.tracks);
       setSkipped(result.skipped);
@@ -77,12 +77,11 @@ export default function App() {
     if (busy) return;
     setBusy(true);
     setFiles([]); setTracks([]); setSkipped([]);
-    setApiKey("");
     setImportProgress({ completed: 0, total: 0, imported: 0, skipped: 0 });
     setError("");
-    let reader: ReturnType<typeof import("@/lib/read-fit-files")["createFitReader"]> | null = null;
+    let reader: ReturnType<typeof import("@/lib/fit/read-files")["createFitReader"]> | null = null;
     try {
-      const [{ importLatestActivities }, { createFitReader }] = await Promise.all([import("@/lib/intervals"), import("@/lib/read-fit-files")]);
+      const [{ importLatestActivities }, { createFitReader }] = await Promise.all([import("@/lib/intervals"), import("@/lib/fit/read-files")]);
       reader = createFitReader();
       const result = await importLatestActivities(key, reader.read, setImportProgress);
       setTracks(result.tracks);
@@ -119,19 +118,8 @@ export default function App() {
       </li>)}</ul>
       <p className={styles.hint}>All tracks start together. The longest moving time becomes {clipSeconds} seconds; shorter rides finish proportionally earlier and stay visible. Pauses are excluded from ride timing; movement along each route remains steady.</p>
     </section>}
-    <section className={styles.integrationCard} aria-labelledby="intervals-title">
-      <div>
-        <h2 id="intervals-title">Intervals.icu</h2>
-        <p className={styles.hint}>Import your latest 100 activities. Find your API key under Developer Settings in <a href="https://intervals.icu/settings" target="_blank" rel="noreferrer">Intervals.icu settings</a>.</p>
-        <p id="api-key-help" className={styles.hint}>Your key goes straight from your browser to Intervals.icu, is used only for this import and is not saved. Personal keys grant broader access, but this app only reads activities.</p>
-      </div>
-      <form className={styles.integrationActions} onSubmit={event => { event.preventDefault(); if (!busy && apiKey.trim()) void importIntervals(apiKey.trim()); }}>
-        <label htmlFor="intervals-api-key">API key</label>
-        <input id="intervals-api-key" type="password" value={apiKey} onChange={event => setApiKey(event.target.value)} autoComplete="off" spellCheck={false} maxLength={256} required disabled={busy} aria-describedby="api-key-help" />
-        <button type="submit" className={styles.primaryButton} disabled={busy || !apiKey.trim()}>{importProgress ? "Importing activities…" : "Import latest 100"}</button>
-      </form>
-      {importProgress && <p className={styles.importProgress} role="status">{busy ? "Importing" : "Imported"} {importProgress.completed} of {importProgress.total} available activities · {importProgress.imported} tracks · {importProgress.skipped} skipped</p>}
-    </section> <div className={`${styles.dropzone} ${dragging ? styles.dragging : ""}`}
+    <IntervalsCard busy={busy} progress={importProgress} onImport={key => void importIntervals(key)} />
+    <div className={`${styles.dropzone} ${dragging ? styles.dragging : ""}`}
       onDragOver={(event) => { event.preventDefault(); if (!busy) setDragging(true); }}
       onDragLeave={() => setDragging(false)}
       onDrop={(event) => { event.preventDefault(); setDragging(false); selectFiles(Array.from(event.dataTransfer.files)); }}>

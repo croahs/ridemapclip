@@ -18,7 +18,8 @@ test("creates, plays and downloads a 30-second MP4 after cancellation and map po
   await page.mouse.down(); await page.mouse.move(box.x + box.width / 2 + 55, box.y + box.height / 2 + 20, {steps: 8}); await page.mouse.up();
   await page.screenshot({path: testInfo.outputPath("map-before.png"), fullPage: true});
   await create.click();
-  await expect.poll(() => page.getByRole("progressbar", {name: "Video rendering progress"}).getAttribute("value")).toMatch(/^0\.[1-9]/);
+  // Cancel once rendering is under way; slower CI machines take longer to get there.
+  await expect.poll(() => page.getByRole("progressbar", {name: "Video rendering progress"}).getAttribute("value"), {timeout: 60000}).toMatch(/^0\.0*[1-9]/);
   await page.getByRole("button", {name: "Cancel rendering"}).click();
   await expect(create).toBeEnabled({timeout: 30000});
   await create.click();

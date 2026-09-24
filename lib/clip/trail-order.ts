@@ -1,4 +1,4 @@
-import { trackProgress } from "./clip";
+import { trackProgress } from "./timing";
 import { playbackSlice, type PlaybackRoute } from "./playback";
 
 export type TimedTrail = {

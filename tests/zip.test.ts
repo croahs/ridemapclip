@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { BlobWriter, Uint8ArrayReader, ZipWriter } from "@zip.js/zip.js";
-import { expandFitInputs, MAX_ZIP_BYTES, MAX_ZIP_ENTRIES } from "../lib/expand-fit-inputs";
-import { MAX_BATCH_BYTES, MAX_FIT_BYTES } from "../lib/fit";
+import { expandFitInputs, MAX_ZIP_BYTES, MAX_ZIP_ENTRIES } from "../lib/fit/zip";
+import { MAX_BATCH_BYTES, MAX_FIT_BYTES } from "../lib/fit/limits";
 
 async function zip(entries: [string, Uint8Array][], options = {}) {
   const writer = new ZipWriter(new BlobWriter(), { useWebWorkers: false, ...options });

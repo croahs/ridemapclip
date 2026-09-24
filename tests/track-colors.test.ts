@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { getTrackColor, TRACK_COLORS } from "../lib/track-colors";
+import { getTrackColor, TRACK_COLORS } from "../lib/clip/track-colors";
 
 test("returns curated colors for batches up to 5 tracks", () => {
   for (let i = 0; i < 5; i++) {

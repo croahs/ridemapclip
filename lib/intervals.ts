@@ -1,5 +1,5 @@
-import { MAX_FIT_BYTES } from "./fit";
-import type { FitWorkerResult } from "./fit-worker-types";
+import { MAX_FIT_BYTES } from "./fit/limits";
+import type { FitWorkerResult } from "./fit/types";
 import type { Track } from "./track";
 
 const API_BASE = "https://intervals.icu/api";

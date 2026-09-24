@@ -1,9 +1,9 @@
 import type L from "leaflet";
-import type { Track } from "./track";
-import { mercator, type ClipView } from "./clip-renderer";
+import type { Track } from "../track";
+import { mercator, type ClipView } from "./renderer";
 import { mapTileFilter, type MapTheme } from "./map-theme";
 import { VIDEO_FORMATS, type VideoFormat } from "./video-format";
-import type { MapFrame, RenderMessage, RenderRequest } from "./render-video-types";
+import type { MapFrame, RenderMessage, RenderRequest } from "./export-types";
 
 export type VideoProgress = { fraction: number; message: string };
 
@@ -56,7 +56,7 @@ export async function renderVideo(map: L.Map, tracks: Track[], clipMs: number, t
   const { width, height } = VIDEO_FORMATS[format];
   progress({ fraction: 0, message: "Preparing your map…" });
   const { background, view, frame } = await capture(map, theme, width, height, signal);
-  const worker = new Worker(new URL("./render-video.worker.ts", import.meta.url), { type: "module" });
+  const worker = new Worker(new URL("./export.worker.ts", import.meta.url), { type: "module" });
   try {
     return await new Promise<Blob>((resolve, reject) => {
       const abort = () => reject(signal.reason);

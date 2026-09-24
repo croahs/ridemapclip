@@ -2,9 +2,9 @@ import { createPlaybackRoute, playbackLocation, type PlaybackRoute } from "./pla
 import { chronologicalTrailSlices } from "./trail-order";
 import { getTrackColor } from "./track-colors";
 import { glowOpacityMultiplier, type MapTheme } from "./map-theme";
-import { formatRideElapsed } from "./format";
-import { riderAppearance, trackDurationsMs, trackProgress } from "./clip";
-import type { Track } from "./track";
+import { formatRideElapsed } from "../format";
+import { riderAppearance, trackDurationsMs, trackProgress } from "./timing";
+import type { Track } from "../track";
 
 export type Point = [number, number];
 type Context = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;

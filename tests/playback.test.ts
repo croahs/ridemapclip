@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createPlaybackRoute, playbackPosition, playbackSlice } from "../lib/playback";
-import { pixelRoute, pixelTail } from "../lib/clip-renderer";
+import { createPlaybackRoute, playbackPosition, playbackSlice } from "../lib/clip/playback";
+import { pixelRoute, pixelTail } from "../lib/clip/renderer";
 import type { TrackPoint } from "../lib/track";
-import { chronologicalTrailSlices } from "../lib/trail-order";
+import { chronologicalTrailSlices } from "../lib/clip/trail-order";
 
 const point = (longitude: number, breakBefore = false): TrackPoint => ({ latitude: 0, longitude, timestamp: null, elevationMeters: null, breakBefore });
 

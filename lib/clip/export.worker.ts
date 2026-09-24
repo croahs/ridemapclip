@@ -1,7 +1,7 @@
 import { BufferTarget, CanvasSource, Mp4OutputFormat, Output, Quality, canEncodeVideo } from "mediabunny";
-import { CLIP_STYLE, createScene, drawGlow, drawOverlays, drawRiders, drawTrails } from "./clip-renderer";
-import { VIDEO_FPS, videoFrameCount, videoFrameTiming } from "./clip";
-import type { RenderRequest, RenderMessage } from "./render-video-types";
+import { CLIP_STYLE, createScene, drawGlow, drawOverlays, drawRiders, drawTrails } from "./renderer";
+import { VIDEO_FPS, videoFrameCount, videoFrameTiming } from "./timing";
+import type { RenderRequest, RenderMessage } from "./export-types";
 
 const post = (message: RenderMessage, transfer: Transferable[] = []) => self.postMessage(message, { transfer });
 

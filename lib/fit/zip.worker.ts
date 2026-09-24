@@ -1,4 +1,4 @@
-import { expandFitInputs } from "./expand-fit-inputs";
+import { expandFitInputs } from "./zip";
 
 self.onmessage = async (event: MessageEvent<{ incoming: File[]; existing: { name: string; size: number }[] }>) => {
   try {

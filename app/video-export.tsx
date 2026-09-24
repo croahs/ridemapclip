@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import type L from "leaflet";
 import type { Track } from "@/lib/track";
-import type { VideoProgress } from "@/lib/render-video";
-import type { MapTheme } from "@/lib/map-theme";
-import { VIDEO_FORMATS, type VideoFormat } from "@/lib/video-format";
+import type { VideoProgress } from "@/lib/clip/export";
+import type { MapTheme } from "@/lib/clip/map-theme";
+import { VIDEO_FORMATS, type VideoFormat } from "@/lib/clip/video-format";
 import styles from "./app.module.css";
 
 export default function VideoExport({ tracks, clipMs, mapTheme, videoFormat, getMap, pausePreview, onBusy }: {
@@ -32,7 +32,7 @@ export default function VideoExport({ tracks, clipMs, mapTheme, videoFormat, get
     const handlers = [map.dragging, map.scrollWheelZoom, map.doubleClickZoom, map.boxZoom, map.keyboard, map.touchZoom].filter(handler => handler.enabled());
     handlers.forEach(handler => handler.disable());
     try {
-      const { renderVideo } = await import("@/lib/render-video");
+      const { renderVideo } = await import("@/lib/clip/export");
       const blob = await renderVideo(map, tracks, clipMs, mapTheme, videoFormat, task.signal, value => { if (!task.signal.aborted) setProgress(value); });
       if (task.signal.aborted) return;
       const next = URL.createObjectURL(blob);
