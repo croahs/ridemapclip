@@ -84,10 +84,35 @@ test("date colours run from the earliest ride to the latest in cards and video",
     rideFit("earliest.fit", 4, 300, new Date("2024-01-01T08:00:00Z")),
   ]);
   await page.getByRole("button", { name: "Create 3 tracks", exact: true }).click();
-  await page.getByRole("button", { name: "By date", exact: true }).click();
+  await page.getByLabel("Colors").selectOption("date");
   const color = (name: string) => page.locator("li", { hasText: name }).first().evaluate(element => getComputedStyle(element).getPropertyValue("--track-color").trim());
   expect(await color("earliest.fit")).toBe("#0ea5e9");
   expect(await color("latest.fit")).toBe("#f97316");
   await page.getByRole("button", { name: "Create video", exact: true }).click();
   await expect(page.getByText("Your video is ready.")).toBeVisible({ timeout: 180000 });
+});
+
+test("per-point colour modes use the rides' own data and export", async ({ page }) => {
+  await stubTiles(page);
+  await page.goto("/");
+  await page.locator('input[type="file"]').setInputFiles([rideFit("hilly.fit", 0, 600), rideFit("flat.fit", 3, 900)]);
+  await page.getByRole("button", { name: "Create 2 tracks", exact: true }).click();
+  const colors = page.getByLabel("Colors");
+  for (const mode of ["elevation", "power30", "speed", "avgSpeed"]) {
+    await colors.selectOption(mode);
+    await expect(page.getByText(/shown in grey/)).toHaveCount(0);
+  }
+  await colors.selectOption("power30");
+  await page.getByRole("button", { name: "Play animation", exact: true }).click();
+  await page.getByRole("button", { name: "Create video", exact: true }).click();
+  await expect(page.getByText("Your video is ready.")).toBeVisible({ timeout: 180000 });
+});
+
+test("rides without the chosen data are explained", async ({ page }) => {
+  await stubTiles(page);
+  await page.goto("/");
+  await page.locator('input[type="file"]').setInputFiles([rideFit("with-power.fit", 0, 300), rideFit("no-power.fit", 3, 300, undefined, { power: false })]);
+  await page.getByRole("button", { name: "Create 2 tracks", exact: true }).click();
+  await page.getByLabel("Colors").selectOption("power30");
+  await expect(page.getByText("1 ride has no power data and is shown in grey.")).toBeVisible();
 });

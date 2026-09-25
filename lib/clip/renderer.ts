@@ -1,6 +1,6 @@
 import { createPlaybackRoute, playbackLocation, routeCoordinate, type PlaybackRoute } from "./playback";
 import { chronologicalTrailSlices } from "./trail-order";
-import { DATE_GRADIENT, trackColors, trackDateRange, type ColorMode } from "./track-colors";
+import { NO_DATA_COLOR, NO_DATA_INDEX, colorScheme, type ColorLegend, type ColorMode } from "./track-colors";
 import { glowOpacityMultiplier, type MapTheme } from "./map-theme";
 import { formatRideElapsed } from "../format";
 import { riderAppearance, trackDurationsMs, trackProgress } from "./timing";
@@ -42,33 +42,40 @@ export type ClipView = { zoom: number; scale: number; dx: number; dy: number };
 /** A route in Mercator pixels at one zoom, without sub-pixel detail, for cheap glow tails. */
 type PixelRoute = { points: Point[]; source: number[]; sectionStart: boolean[] };
 
-type Rider = { route: PlaybackRoute; color: string; durationMs: number };
-/** First and last ride date (YYYY-MM-DD), shown as a gradient legend in "date" colour mode. */
-type DateLegend = { first: string; last: string } | null;
-export type ClipScene = { clipMs: number; riders: Rider[]; large: boolean; longestSeconds: number; dateLegend: DateLegend; pixelRoutes: Map<string, PixelRoute[]> };
+/** `pointColors` (palette indices per GPS point) is set only in per-point colour modes. */
+type Rider = { route: PlaybackRoute; color: string; pointColors: Uint8Array | null; durationMs: number };
+export type ClipScene = {
+  clipMs: number; riders: Rider[]; large: boolean; longestSeconds: number;
+  palette: string[]; legend: ColorLegend | null; pixelRoutes: Map<string, PixelRoute[]>;
+};
 
 export function createScene(tracks: Track[], clipMs: number, colorMode: ColorMode): ClipScene {
   const durations = trackDurationsMs(tracks, clipMs);
   const scene: ClipScene = {
     clipMs,
-    riders: tracks.map((track, index) => ({ route: createPlaybackRoute(track.path), color: "", durationMs: durations[index] })),
+    riders: tracks.map((track, index) => ({ route: createPlaybackRoute(track.path), color: "", pointColors: null, durationMs: durations[index] })),
     large: tracks.length > CLIP_STYLE.largePackAbove,
     longestSeconds: Math.max(0, ...tracks.map(track => track.movingSeconds ?? 0)),
-    dateLegend: null,
+    palette: [],
+    legend: null,
     pixelRoutes: new Map(),
   };
   recolorScene(scene, tracks, colorMode);
   return scene;
 }
 
-/** Applies a colour mode to an existing scene (cheap: no routes are rebuilt). */
+/** Applies a colour mode to an existing scene (no routes are rebuilt). */
 export function recolorScene(scene: ClipScene, tracks: Track[], colorMode: ColorMode) {
-  const colors = trackColors(tracks, colorMode);
-  scene.riders.forEach((rider, index) => { rider.color = colors[index]; });
-  const range = colorMode === "date" ? trackDateRange(tracks) : null;
-  const day = (time: number) => new Date(time).toISOString().slice(0, 10);
-  scene.dateLegend = range ? { first: day(range.first), last: day(range.last) } : null;
+  const scheme = colorScheme(tracks, colorMode);
+  scene.riders.forEach((rider, index) => {
+    rider.color = scheme.rideColors[index];
+    rider.pointColors = scheme.pointColors[index];
+  });
+  scene.palette = scheme.palette;
+  scene.legend = scheme.legend;
 }
+
+const paletteColor = (scene: ClipScene, index: number) => index === NO_DATA_INDEX ? NO_DATA_COLOR : scene.palette[index];
 
 const size = (scene: ClipScene, value: { normal: number; large: number }) => scene.large ? value.large : value.normal;
 
@@ -167,8 +174,28 @@ function stroke(ctx: Context, sections: Point[][], color: string, width: number,
  * layer. Slices are drawn oldest first, so the latest rider stays on top.
  */
 export function drawTrails(ctx: Context, scene: ClipScene, fromMs: number, toMs: number, view: ClipView) {
+  const width = size(scene, CLIP_STYLE.trailWidth) * view.scale;
   for (const slice of chronologicalTrailSlices(scene.riders, fromMs, toMs)) {
-    stroke(ctx, slice.sections.map(section => section.map(coordinate => project(view, coordinate))), slice.color, size(scene, CLIP_STYLE.trailWidth) * view.scale);
+    const sections = slice.sections.map(section => ({ points: section.points.map(coordinate => project(view, coordinate)), indices: section.indices }));
+    if (!slice.pointColors) {
+      stroke(ctx, sections.map(section => section.points), slice.color, width);
+      continue;
+    }
+    // Per-point colours: one path per run of equal colour, not one per segment.
+    for (const { points, indices } of sections) {
+      let runColor = -1;
+      let run: Point[] = [];
+      for (let k = 1; k < points.length; k++) {
+        const color = slice.pointColors[indices[k]];
+        if (color !== runColor) {
+          if (run.length > 1) stroke(ctx, [run], paletteColor(scene, runColor), width);
+          run = [points[k - 1]];
+          runColor = color;
+        }
+        run.push(points[k]);
+      }
+      if (run.length > 1) stroke(ctx, [run], paletteColor(scene, runColor), width);
+    }
   }
 }
 
@@ -190,11 +217,13 @@ export function drawGlow(ctx: Context, scene: ClipScene, elapsedMs: number, them
 
 /** Rider dots, above everything else. Returns their canvas positions (null when hidden). */
 export function drawRiders(ctx: Context, scene: ClipScene, elapsedMs: number, view: ClipView): (Point | null)[] {
-  return scene.riders.map(({ route, color, durationMs }) => {
+  return scene.riders.map(({ route, color, pointColors, durationMs }) => {
     if (!riderAppearance(elapsedMs, durationMs, scene.clipMs).visible) return null;
-    const position = project(view, playbackLocation(route, trackProgress(elapsedMs, durationMs)).position);
+    const location = playbackLocation(route, trackProgress(elapsedMs, durationMs));
+    const position = project(view, location.position);
     ctx.beginPath(); ctx.arc(...position, size(scene, CLIP_STYLE.riderRadius) * view.scale, 0, Math.PI * 2);
-    ctx.fillStyle = color; ctx.fill();
+    // In per-point modes the dot shows the value where the rider is now.
+    ctx.fillStyle = pointColors ? paletteColor(scene, pointColors[location.index]) : color; ctx.fill();
     ctx.strokeStyle = "white"; ctx.lineWidth = size(scene, CLIP_STYLE.riderOutline) * view.scale; ctx.stroke();
     return position;
   });
@@ -211,10 +240,10 @@ export function drawOverlays(ctx: Context, scene: ClipScene, elapsedMs: number, 
   const time = formatRideElapsed(scene.longestSeconds > 0 ? scene.longestSeconds * elapsedMs / scene.clipMs : null, scene.longestSeconds >= 3600);
   box(time, `bold ${32 * unit}px Arial`, 24, 52, 37, "#0f172acc");
   box(CLIP_STYLE.watermark, `bold ${18 * unit}px Arial`, 88, 36, 24, "#0f172a99");
-  if (scene.dateLegend) {
-    // first date ▬▬ last date, with the bar in the same gradient the rides use.
+  if (scene.legend) {
+    // low value ▬▬ high value, with the bar in the same gradient the rides use.
     ctx.font = `${16 * unit}px Arial`;
-    const { first, last } = scene.dateLegend;
+    const { from: first, to: last, gradient: stops } = scene.legend;
     const firstWidth = ctx.measureText(first).width;
     const barX = 40 * unit + firstWidth + 10 * unit;
     const barWidth = 120 * unit;
@@ -224,7 +253,7 @@ export function drawOverlays(ctx: Context, scene: ClipScene, elapsedMs: number, 
     ctx.fillText(first, 40 * unit, 158 * unit);
     ctx.fillText(last, barX + barWidth + 10 * unit, 158 * unit);
     const gradient = ctx.createLinearGradient(barX, 0, barX + barWidth, 0);
-    DATE_GRADIENT.forEach((color, index) => gradient.addColorStop(index / (DATE_GRADIENT.length - 1), color));
+    stops.forEach((color, index) => gradient.addColorStop(index / (stops.length - 1), color));
     ctx.fillStyle = gradient;
     ctx.fillRect(barX, 148 * unit, barWidth, 10 * unit);
   }

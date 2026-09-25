@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { CLIP_SECONDS, clampClipSeconds } from "@/lib/clip/timing";
 import type { MapTheme } from "@/lib/clip/map-theme";
-import type { ColorMode } from "@/lib/clip/track-colors";
+import { COLOR_MODES, type ColorMode } from "@/lib/clip/track-colors";
 import { VIDEO_FORMATS, type VideoFormat } from "@/lib/clip/video-format";
 import styles from "./app.module.css";
 
@@ -19,21 +19,12 @@ export default function MapToolbar({ clipSeconds, onClipSecondsChange, colorMode
     <div className={styles.mapToolbar}>
       <div className={styles.mapOptions}>
         <ClipLength seconds={clipSeconds} disabled={rendering} onChange={onClipSecondsChange} />
-        <div className={styles.themeControl} role="group" aria-label="Track colors">
+        <label className={styles.themeControl}>
           <span>Colors</span>
-          {([["ride", "By ride"], ["date", "By date"]] as const).map(([mode, label]) => (
-            <button
-              key={mode}
-              type="button"
-              className={`${styles.secondaryButton} ${colorMode === mode ? styles.themeButtonActive : ""}`}
-              disabled={rendering}
-              aria-pressed={colorMode === mode}
-              onClick={() => onColorModeChange(mode)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+          <select className={styles.lengthInput} value={colorMode} disabled={rendering} onChange={event => onColorModeChange(event.target.value as ColorMode)}>
+            {(Object.keys(COLOR_MODES) as ColorMode[]).map(mode => <option key={mode} value={mode}>{COLOR_MODES[mode].label}</option>)}
+          </select>
+        </label>
         <div className={styles.themeControl} role="group" aria-label="Map theme">
           <span>Map</span>
           {(["dark", "light"] as const).map((theme) => (

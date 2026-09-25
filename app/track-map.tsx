@@ -14,9 +14,11 @@ type Props = {
   tracks: Track[]; colors: string[];
   clipSeconds: number; onClipSecondsChange: (seconds: number) => void;
   colorMode: ColorMode; onColorModeChange: (mode: ColorMode) => void;
+  /** Explains rides shown in grey because they lack data for the colour mode. */
+  colorNote: string;
 };
 
-export default function TrackMap({ tracks, colors, clipSeconds, onClipSecondsChange, colorMode, onColorModeChange }: Props) {
+export default function TrackMap({ tracks, colors, clipSeconds, onClipSecondsChange, colorMode, onColorModeChange, colorNote }: Props) {
   const clipMs = clipSeconds * 1000;
   const [rendering, setRendering] = useState(false);
   const [mapTheme, setMapTheme] = useState<MapTheme>("dark");
@@ -88,6 +90,7 @@ export default function TrackMap({ tracks, colors, clipSeconds, onClipSecondsCha
         onPlay={() => controls.current?.play()} onPause={() => controls.current?.pause()} onRestart={() => controls.current?.replay()} onFullscreen={toggleFullscreen} />
       {fullscreenError && <p className={styles.error} role="alert">{fullscreenError}</p>}
       {tracks.some((track) => !track.movingSeconds || track.movingSeconds <= 0) && <p className={styles.hint}>Rides without a moving time use the full clip length.</p>}
+      {colorNote && <p className={styles.hint} role="status">{colorNote}</p>}
       <MapToolbar clipSeconds={clipSeconds} onClipSecondsChange={onClipSecondsChange} colorMode={colorMode} onColorModeChange={onColorModeChange} mapTheme={mapTheme} onMapTheme={setMapTheme}
         videoFormat={videoFormat} onVideoFormat={setVideoFormat} rendering={rendering} onRecenter={recenter} />
       <div className={styles.mapWrapper} data-format={videoFormat} style={{ "--map-aspect-ratio": VIDEO_FORMATS[videoFormat].aspectRatio } as CSSProperties}>

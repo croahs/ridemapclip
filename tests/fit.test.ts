@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Encoder, Profile, type FileIdMesg } from "@garmin/fitsdk";
-import { parseFit, readFit } from "../lib/fit/parse";
+import { parseFit, readFit, rollingPower } from "../lib/fit/parse";
 import { MAX_FIT_BYTES, MAX_BATCH_BYTES, validateFitBatch, validateFitFile } from "../lib/fit/limits";
 import { createPlaybackRoute } from "../lib/clip/playback";
 
@@ -102,4 +102,22 @@ test("readFit returns tracks, names GPS-less skips and names damaged files", () 
   const broken = readFit(new TextEncoder().encode("not a real FIT recording").buffer, "broken.fit");
   assert.equal(broken.kind, "error");
   assert.match(broken.kind === "error" ? broken.message : "", /^broken.fit: /);
+});
+
+test("keeps elevation, speed and 30-second power per point", () => {
+  const records = Array.from({ length: 40 }, (_, i) => ({ ...point(48 + i * 0.0001, 2, i), altitude: 100 + i, speed: 5, power: i < 20 ? 100 : 300 }));
+  const { path } = parseFit(recording(records), "power.fit");
+  assert.equal(path.elevations[39], 139);
+  assert.equal(path.speeds[0], 5);
+  assert.equal(path.power30[19], 100);
+  // At 39 s the trailing 30 s window holds 10 samples of 100 W and 20 of 300 W.
+  assert.ok(Math.abs(path.power30[39] - (10 * 100 + 20 * 300) / 30) < 1e-3);
+});
+
+test("missing power stays unknown and does not drag the 30-second average down", () => {
+  const power = rollingPower([null, 200, null, 400], [0, 1000, 2000, 3000]);
+  assert.ok(Number.isNaN(power[0]));
+  assert.deepEqual(Array.from(power.slice(1)), [200, 200, 300]);
+  const noTimes = rollingPower(Array.from({ length: 40 }, (_, i) => i < 10 ? 0 : 100), Array(40).fill(null));
+  assert.equal(noTimes[39], 100);
 });

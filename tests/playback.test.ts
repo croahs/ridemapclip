@@ -67,10 +67,10 @@ test("playback slices contain only the newly drawn route", () => {
   const route = createPlaybackRoute([point(0), point(0.001), point(0.01)]);
   const first = playbackSlice(route, 0, 0.5);
   const second = playbackSlice(route, 0.5, 1);
-  assert.deepEqual(first[0][0], [0, 0]);
-  assert.ok(Math.abs(first[0].at(-1)![1] - 0.005) < 1e-9);
-  assert.ok(Math.abs(second[0][0][1] - 0.005) < 1e-9);
-  assert.deepEqual(second[0].at(-1), [0, 0.01]);
+  assert.deepEqual(first[0].points[0], [0, 0]);
+  assert.ok(Math.abs(first[0].points.at(-1)![1] - 0.005) < 1e-9);
+  assert.ok(Math.abs(second[0].points[0][1] - 0.005) < 1e-9);
+  assert.deepEqual(second[0].points.at(-1), [0, 0.01]);
   assert.deepEqual(playbackSlice(route, 0.75, 0.5), []);
 });
 
@@ -78,8 +78,8 @@ test("playback slices keep recording gaps disconnected", () => {
   const route = createPlaybackRoute([point(0), point(1), point(10, true), point(11)]);
   const sections = playbackSlice(route, 0.25, 0.75);
   assert.equal(sections.length, 2);
-  assert.ok(sections[0].at(-1)![1] <= 1);
-  assert.ok(sections[1][0][1] >= 10);
+  assert.ok(sections[0].points.at(-1)![1] <= 1);
+  assert.ok(sections[1].points[0][1] >= 10);
 });
 
 test("new trail slices are ordered by when they were drawn", () => {

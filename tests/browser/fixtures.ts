@@ -12,7 +12,7 @@ function encode(records: RecordMesg[], started = start) {
 }
 
 /** A synthetic loop ride: one GPS point per second, variant shifts size and position. */
-export function rideFit(name: string, variant = 0, seconds = 300, started = start) {
+export function rideFit(name: string, variant = 0, seconds = 300, started = start, { power = true } = {}) {
   const radius = 0.004 + (variant % 7) * 0.0015;
   const records = Array.from({ length: seconds }, (_, i) => {
     const angle = i / seconds * Math.PI * 2;
@@ -20,6 +20,8 @@ export function rideFit(name: string, variant = 0, seconds = 300, started = star
       positionLat: semicircles(58.85 + (variant % 5) * 0.002 + radius * Math.sin(angle)),
       positionLong: semicircles(5.73 + Math.floor(variant / 5) * 0.003 + radius * 2 * Math.cos(angle)),
       timestamp: new Date(started.getTime() + i * 1000),
+      altitude: 50 + variant * 10 + 40 * Math.sin(angle * 2),
+      ...(power && { power: Math.round(180 + 120 * Math.sin(angle * 3 + variant)) }),
     } as RecordMesg;
   });
   return { name, mimeType: "application/octet-stream", buffer: encode(records, started) };

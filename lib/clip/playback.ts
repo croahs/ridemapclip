@@ -20,7 +20,7 @@ type PlaybackLocation = {
 
 export const routeCoordinate = (route: PlaybackRoute, index: number): Coordinate => [route.latitudes[index], route.longitudes[index]];
 
-export function createPlaybackRoute({ latitudes, longitudes: raw, breaks }: TrackPath): PlaybackRoute {
+export function createPlaybackRoute({ latitudes, longitudes: raw, breaks }: Pick<TrackPath, "latitudes" | "longitudes" | "breaks">): PlaybackRoute {
   const count = latitudes.length;
   if (count < 2) throw new Error("Playback requires at least two GPS points.");
   const longitudes = new Float64Array(count);
@@ -91,19 +91,22 @@ export function playbackPosition(route: PlaybackRoute, progress: number): Coordi
   return playbackLocation(route, progress).position;
 }
 
+/** A stretch of revealed route; `indices[k]` is the GPS point that `points[k]` reaches (for per-point colours). */
+export type RouteSection = { points: Coordinate[]; indices: number[] };
+
 /** Returns only the newly revealed route between two playback positions. */
-export function playbackSlice(route: PlaybackRoute, fromProgress: number, toProgress: number): Coordinate[][] {
+export function playbackSlice(route: PlaybackRoute, fromProgress: number, toProgress: number): RouteSection[] {
   const startFraction = Math.min(1, Math.max(0, fromProgress));
   const endFraction = Math.min(1, Math.max(0, toProgress));
   if (endFraction <= startFraction) return [];
 
   const start = playbackLocation(route, startFraction);
   const end = playbackLocation(route, endFraction);
-  const sections: Coordinate[][] = [];
-  let section: Coordinate[] = [start.position];
+  const sections: RouteSection[] = [];
+  let section: RouteSection = { points: [start.position], indices: [start.index] };
 
   const finishSection = () => {
-    if (section.length > 1) sections.push(section);
+    if (section.points.length > 1) sections.push(section);
   };
 
   for (let displayPosition = displayAfter(route, start.index); displayPosition < route.displayIndices.length; displayPosition++) {
@@ -111,13 +114,17 @@ export function playbackSlice(route: PlaybackRoute, fromProgress: number, toProg
     if (displayIndex > end.index) break;
     if (route.breaks[displayIndex]) {
       finishSection();
-      section = [routeCoordinate(route, displayIndex)];
+      section = { points: [routeCoordinate(route, displayIndex)], indices: [displayIndex] };
     } else {
-      section.push(routeCoordinate(route, displayIndex));
+      section.points.push(routeCoordinate(route, displayIndex));
+      section.indices.push(displayIndex);
     }
   }
 
-  if (!sameCoordinate(section[section.length - 1], end.position)) section.push(end.position);
+  if (!sameCoordinate(section.points[section.points.length - 1], end.position)) {
+    section.points.push(end.position);
+    section.indices.push(Math.min(route.latitudes.length - 1, end.index + (end.ratio > 0 ? 1 : 0)));
+  }
   finishSection();
   return sections;
 }

@@ -9,6 +9,30 @@ export class FitError extends Error {}
 export class NoGpsFitError extends FitError {}
 
 const SEMICIRCLES_TO_DEGREES = 180 / 2 ** 31;
+const POWER_WINDOW_MS = 30_000;
+
+/**
+ * Trailing 30-second average power at each point (the usual "30 s power").
+ * Samples without power are left out of the average; no power at all gives NaN.
+ */
+export function rollingPower(powers: (number | null)[], times: (number | null)[]): Float32Array {
+  const result = new Float32Array(powers.length).fill(NaN);
+  // Without timestamps, assume one sample per second.
+  const at = (i: number) => times[i] ?? i * 1000;
+  let start = 0;
+  let sum = 0;
+  let count = 0;
+  for (let i = 0; i < powers.length; i++) {
+    const power = powers[i];
+    if (power !== null) { sum += power; count++; }
+    while (at(i) - at(start) >= POWER_WINDOW_MS) {
+      const old = powers[start++];
+      if (old !== null) { sum -= old; count--; }
+    }
+    if (count) result[i] = sum / count;
+  }
+  return result;
+}
 const MAX_TRACK_POINTS = 200_000;
 
 function finiteNumber(value: unknown): value is number {
@@ -33,6 +57,9 @@ export function parseFit(buffer: ArrayBuffer, name: string): Track {
 
   const points: TrackPoint[] = [];
   const speeds: (number | null)[] = [];
+  const elevations: number[] = [];
+  const powers: (number | null)[] = [];
+  const times: (number | null)[] = [];
   let skippedRecords = 0;
   let breakNext = false;
   let gaps = 0;
@@ -70,6 +97,10 @@ export function parseFit(buffer: ArrayBuffer, name: string): Track {
     points.push(point);
     const speed = finiteNumber(record.enhancedSpeed) ? record.enhancedSpeed : record.speed;
     speeds.push(finiteNumber(speed) && speed >= 0 ? speed : null);
+    const elevation = finiteNumber(record.enhancedAltitude) ? record.enhancedAltitude : record.altitude;
+    elevations.push(finiteNumber(elevation) ? elevation : NaN);
+    powers.push(finiteNumber(record.power) && record.power >= 0 ? record.power : null);
+    times.push(time);
     breakNext = false;
   }
   if (points.length < 2) throw new NoGpsFitError("This FIT file has fewer than two GPS points. Indoor rides and recordings without GPS cannot make a track.");
@@ -91,11 +122,25 @@ export function parseFit(buffer: ArrayBuffer, name: string): Track {
       latitudes: Float64Array.from(points, point => point.latitude),
       longitudes: Float64Array.from(points, point => point.longitude),
       breaks: Uint8Array.from(points, point => point.breakBefore ? 1 : 0),
+      elevations: Float32Array.from(elevations),
+      speeds: pointSpeeds(points, speeds, times),
+      power30: rollingPower(powers, times),
     },
     elapsedSeconds: earliest !== null && latest !== null && latest > earliest ? (latest - earliest) / 1000 : null,
     startedAt: earliest === null ? null : new Date(earliest).toISOString(),
     endedAt: latest === null ? null : new Date(latest).toISOString(),
   };
+}
+
+/** Recorded speed where the device has it; otherwise GPS distance over time since the previous point. */
+function pointSpeeds(points: TrackPoint[], recorded: (number | null)[], times: (number | null)[]): Float32Array {
+  return Float32Array.from(points, (point, i) => {
+    const speed = recorded[i];
+    if (speed !== null) return speed;
+    const previous = points[i - 1];
+    const seconds = i > 0 && times[i] !== null && times[i - 1] !== null ? (times[i]! - times[i - 1]!) / 1000 : 0;
+    return previous && !point.breakBefore && seconds > 0 ? distanceBetween(previous, point) / seconds : NaN;
+  });
 }
 
 /** Classifies one recording: a track, a GPS-less skip, or a named failure. */
