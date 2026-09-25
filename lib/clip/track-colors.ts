@@ -5,17 +5,18 @@ export const TRACK_COLORS = ["#0284c7", "#dc2626", "#7c3aed", "#059669", "#d9770
 
 /**
  * How rides are coloured. "ride" and "date" and "avgSpeed" give each ride one colour;
- * "elevation", "power30" and "speed" colour every point, so a trail changes colour
+ * "elevation", "power30", "speed" and "heartRate" colour every point, so a trail changes colour
  * along the route and the rider dot shows the current value.
  */
-export type ColorMode = "ride" | "date" | "avgSpeed" | "elevation" | "power30" | "speed";
-type PointMetric = "elevations" | "speeds" | "power30";
+export type ColorMode = "ride" | "date" | "avgSpeed" | "elevation" | "power30" | "speed" | "heartRate";
+type PointMetric = "elevations" | "speeds" | "power30" | "heartRates";
 
 /** Low → high. Mid-lightness stops stay readable on both the dark and the light map. */
 export const DATE_GRADIENT = ["#0ea5e9", "#8b5cf6", "#ec4899", "#f97316"] as const;
 export const ELEVATION_GRADIENT = ["#22c55e", "#eab308", "#ef4444"] as const;
 export const POWER_GRADIENT = ["#6366f1", "#d946ef", "#facc15"] as const;
 export const SPEED_GRADIENT = ["#3b82f6", "#06b6d4", "#facc15", "#ef4444"] as const;
+export const HEART_RATE_GRADIENT = ["#3b82f6", "#22c55e", "#eab308", "#ef4444"] as const;
 /** Rides or points without data for the chosen mode. */
 export const NO_DATA_COLOR = "#94a3b8";
 
@@ -29,6 +30,7 @@ export const COLOR_MODES: Record<ColorMode, { label: string; missing: string; gr
   elevation: { label: "Elevation", missing: "no elevation data", gradient: ELEVATION_GRADIENT, metric: "elevations", format: value => `${Math.round(value)} m` },
   power30: { label: "30 s power", missing: "no power data", gradient: POWER_GRADIENT, metric: "power30", format: value => `${Math.round(value)} W` },
   speed: { label: "Speed", missing: "no speed data", gradient: SPEED_GRADIENT, metric: "speeds", format: value => kmh(value, 0) },
+  heartRate: { label: "Heart rate", missing: "no heart rate data", gradient: HEART_RATE_GRADIENT, metric: "heartRates", format: value => `${Math.round(value)} bpm` },
 };
 
 /**

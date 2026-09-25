@@ -104,11 +104,13 @@ test("readFit returns tracks, names GPS-less skips and names damaged files", () 
   assert.match(broken.kind === "error" ? broken.message : "", /^broken.fit: /);
 });
 
-test("keeps elevation, speed and 30-second power per point", () => {
-  const records = Array.from({ length: 40 }, (_, i) => ({ ...point(48 + i * 0.0001, 2, i), altitude: 100 + i, speed: 5, power: i < 20 ? 100 : 300 }));
+test("keeps elevation, speed, 30-second power and heart rate per point", () => {
+  const records = Array.from({ length: 40 }, (_, i) => ({ ...point(48 + i * 0.0001, 2, i), altitude: 100 + i, speed: 5, power: i < 20 ? 100 : 300, heartRate: i === 5 ? undefined : 120 + i }));
   const { path } = parseFit(recording(records), "power.fit");
   assert.equal(path.elevations[39], 139);
   assert.equal(path.speeds[0], 5);
+  assert.equal(path.heartRates[39], 159);
+  assert.ok(Number.isNaN(path.heartRates[5]));
   assert.equal(path.power30[19], 100);
   // At 39 s the trailing 30 s window holds 10 samples of 100 W and 20 of 300 W.
   assert.ok(Math.abs(path.power30[39] - (10 * 100 + 20 * 300) / 30) < 1e-3);

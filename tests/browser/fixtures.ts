@@ -22,6 +22,7 @@ export function rideFit(name: string, variant = 0, seconds = 300, started = star
       timestamp: new Date(started.getTime() + i * 1000),
       altitude: 50 + variant * 10 + 40 * Math.sin(angle * 2),
       ...(power && { power: Math.round(180 + 120 * Math.sin(angle * 3 + variant)) }),
+      heartRate: Math.round(130 + 30 * Math.sin(angle * 2 + variant)),
     } as RecordMesg;
   });
   return { name, mimeType: "application/octet-stream", buffer: encode(records, started) };

@@ -1,8 +1,9 @@
 /**
- * A GPS path as parallel arrays (about 29 bytes per point): with up to 1000
+ * A GPS path as parallel arrays (about 33 bytes per point): with up to 1000
  * rides, one object per point would cost gigabytes. `breaks[i]` is 1 when a
  * recording gap precedes point i. Per-point metrics are NaN where unknown:
- * elevation in metres, speed in m/s, and 30-second average power in watts.
+ * elevation in metres, speed in m/s, 30-second average power in watts, and
+ * heart rate in bpm (as recorded: it changes slowly enough to need no smoothing).
  */
 export type TrackPath = {
   latitudes: Float64Array;
@@ -11,6 +12,7 @@ export type TrackPath = {
   elevations: Float32Array;
   speeds: Float32Array;
   power30: Float32Array;
+  heartRates: Float32Array;
 };
 
 export type Track = {

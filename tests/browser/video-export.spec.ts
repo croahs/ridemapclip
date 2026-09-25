@@ -98,7 +98,7 @@ test("per-point colour modes use the rides' own data and export", async ({ page 
   await page.locator('input[type="file"]').setInputFiles([rideFit("hilly.fit", 0, 600), rideFit("flat.fit", 3, 900)]);
   await page.getByRole("button", { name: "Create 2 tracks", exact: true }).click();
   const colors = page.getByLabel("Colors");
-  for (const mode of ["elevation", "power30", "speed", "avgSpeed"]) {
+  for (const mode of ["elevation", "power30", "speed", "heartRate", "avgSpeed"]) {
     await colors.selectOption(mode);
     await expect(page.getByText(/shown in grey/)).toHaveCount(0);
   }

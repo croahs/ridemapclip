@@ -59,6 +59,7 @@ export function parseFit(buffer: ArrayBuffer, name: string): Track {
   const speeds: (number | null)[] = [];
   const elevations: number[] = [];
   const powers: (number | null)[] = [];
+  const heartRates: number[] = [];
   const times: (number | null)[] = [];
   let skippedRecords = 0;
   let breakNext = false;
@@ -100,6 +101,7 @@ export function parseFit(buffer: ArrayBuffer, name: string): Track {
     const elevation = finiteNumber(record.enhancedAltitude) ? record.enhancedAltitude : record.altitude;
     elevations.push(finiteNumber(elevation) ? elevation : NaN);
     powers.push(finiteNumber(record.power) && record.power >= 0 ? record.power : null);
+    heartRates.push(finiteNumber(record.heartRate) && record.heartRate > 0 ? record.heartRate : NaN);
     times.push(time);
     breakNext = false;
   }
@@ -125,6 +127,7 @@ export function parseFit(buffer: ArrayBuffer, name: string): Track {
       elevations: Float32Array.from(elevations),
       speeds: pointSpeeds(points, speeds, times),
       power30: rollingPower(powers, times),
+      heartRates: Float32Array.from(heartRates),
     },
     elapsedSeconds: earliest !== null && latest !== null && latest > earliest ? (latest - earliest) / 1000 : null,
     startedAt: earliest === null ? null : new Date(earliest).toISOString(),

@@ -44,6 +44,7 @@ test("date mode handles one date, no dates, and ride mode keeps distinct colours
 
 const pathWith = (elevations: number[]) => ({
   elevations: Float32Array.from(elevations), speeds: new Float32Array(elevations.length).fill(NaN), power30: new Float32Array(elevations.length).fill(NaN),
+  heartRates: Float32Array.from(elevations, value => value + 60),
 });
 
 test("elevation colours every point on one batch-wide green-to-red scale", () => {
@@ -80,4 +81,11 @@ test("average speed gives each ride one colour from slowest to fastest", () => {
   assert.deepEqual(scheme.pointColors, [null, null, null]);
   assert.deepEqual([scheme.legend!.from, scheme.legend!.to], ["20.0 km/h", "36.0 km/h"]);
   assert.equal(scheme.missing, 1);
+});
+
+test("heart rate colours each point in bpm", () => {
+  const scheme = colorScheme([{ startedAt: null, path: pathWith(Array.from({ length: 101 }, (_, i) => i)) }], "heartRate");
+  assert.deepEqual([scheme.legend!.from, scheme.legend!.to], ["62 bpm", "158 bpm"]);
+  assert.equal(scheme.pointColors[0]![100], PALETTE_STEPS - 1);
+  assert.equal(scheme.missing, 0);
 });
