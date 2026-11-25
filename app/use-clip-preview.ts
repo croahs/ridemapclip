@@ -2,23 +2,24 @@ import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { ClipClock, videoFrameCount } from "@/lib/clip/timing";
-import { CLIP_STYLE, createScene, recolorScene, drawGlow, drawOverlays, drawRiders, drawTrails, type ClipView, type Point } from "@/lib/clip/renderer";
+import { CLIP_STYLE, applyColorScheme, createScene, drawGlow, drawOverlays, drawRiders, drawTrails, type ClipView, type Point } from "@/lib/clip/renderer";
 import { mapTileFilter, type MapTheme } from "@/lib/clip/map-theme";
+import { riderTooltipContent } from "@/lib/clip/tooltip";
 import type { VideoFormat } from "@/lib/clip/video-format";
-import type { ColorMode } from "@/lib/clip/track-colors";
+import type { ColorScheme } from "@/lib/clip/track-colors";
 import type { Track } from "@/lib/track";
 import styles from "./app.module.css";
 
 export type PlaybackState = "ready" | "playing" | "paused" | "finished";
-export type PreviewControls = { play: () => void; pause: () => void; replay: () => void; repaint: () => void; setClipMs: (clipMs: number) => void; setColorMode: (mode: ColorMode) => void };
+export type PreviewControls = { play: () => void; pause: () => void; replay: () => void; repaint: () => void; setClipMs: (clipMs: number) => void; setColorScheme: (scheme: ColorScheme) => void };
 
 /**
  * The Leaflet map plus the canvas layers and playback clock of the clip preview.
  * Drawing goes through lib/clip/renderer, exactly like the video export.
  */
-export function useClipPreview({ tracks, clipMs, colorMode, mapTheme, videoFormat }: { tracks: Track[]; clipMs: number; colorMode: ColorMode; mapTheme: MapTheme; videoFormat: VideoFormat }) {
+export function useClipPreview({ tracks, clipMs, colorScheme, mapTheme, videoFormat }: { tracks: Track[]; clipMs: number; colorScheme: ColorScheme; mapTheme: MapTheme; videoFormat: VideoFormat }) {
   const clipMsRef = useRef(clipMs);
-  const colorModeRef = useRef(colorMode);
+  const colorSchemeRef = useRef(colorScheme);
   const mapThemeRef = useRef(mapTheme);
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -39,9 +40,9 @@ export function useClipPreview({ tracks, clipMs, colorMode, mapTheme, videoForma
   }, [clipMs]);
 
   useEffect(() => {
-    colorModeRef.current = colorMode;
-    controls.current?.setColorMode(colorMode);
-  }, [colorMode]);
+    colorSchemeRef.current = colorScheme;
+    controls.current?.setColorScheme(colorScheme);
+  }, [colorScheme]);
 
   useEffect(() => {
     mapThemeRef.current = mapTheme;
@@ -74,7 +75,7 @@ export function useClipPreview({ tracks, clipMs, colorMode, mapTheme, videoForma
     tiles.on("tileerror", () => setTileError(true));
 
     // The preview draws with the same functions as the video export (lib/clip-renderer).
-    let scene = createScene(tracks, clipMsRef.current, colorModeRef.current);
+    let scene = createScene(tracks, clipMsRef.current, colorSchemeRef.current);
     const layer = (pane: string, zIndex: number, className: string) => {
       const element = map.createPane(pane);
       element.style.zIndex = String(zIndex);
@@ -186,7 +187,7 @@ export function useClipPreview({ tracks, clipMs, colorMode, mapTheme, videoForma
         if (distance <= best) { best = distance; nearest = index; }
       });
       if (nearest < 0) { map.closeTooltip(tooltip); return; }
-      tooltip.setLatLng(event.latlng).setContent(`${nearest + 1}. ${tracks[nearest].name}`);
+      tooltip.setLatLng(event.latlng).setContent(riderTooltipContent(nearest, tracks[nearest].name));
       map.openTooltip(tooltip);
     });
     map.on("mouseout", () => map.closeTooltip(tooltip));
@@ -248,7 +249,7 @@ export function useClipPreview({ tracks, clipMs, colorMode, mapTheme, videoForma
       setClipMs: (next: number) => {
         if (next === scene.clipMs) return;
         pause();
-        scene = createScene(tracks, next, colorModeRef.current);
+        scene = createScene(tracks, next, colorSchemeRef.current);
         trailStepMs = scene.clipMs / (videoFrameCount(scene.clipMs) - 1);
         clock = new ClipClock(scene.clipMs);
         clearTrails();
@@ -256,8 +257,8 @@ export function useClipPreview({ tracks, clipMs, colorMode, mapTheme, videoForma
         setElapsed(0);
         setStatus("ready");
       },
-      setColorMode: (mode: ColorMode) => {
-        recolorScene(scene, tracks, mode);
+      setColorScheme: (scheme: ColorScheme) => {
+        applyColorScheme(scene, scheme);
         redraw();
       },
     };

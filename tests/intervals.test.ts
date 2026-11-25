@@ -4,10 +4,12 @@ import {
   activityFitUrl,
   activityListUrl,
   activityName,
+  importLatestActivities,
   INTERVALS_IMPORT_LIMIT,
   mapWithConcurrency,
   retryAfterMs,
   usableActivity,
+  waitWithSignal,
 } from "../lib/intervals";
 
 test("activity list requests the latest bounded batch with only required fields", () => {
@@ -53,4 +55,40 @@ test("bounded mapper visits every item without exceeding concurrency", async () 
   });
   assert.equal(maximum, 2);
   assert.deepEqual(visited.sort((a, b) => a - b), [0, 1, 2, 3, 4, 5]);
+});
+
+test("waitWithSignal rejects immediately on abort and does not wait out the timer", async () => {
+  const controller = new AbortController();
+  const reason = new Error("user cancelled");
+  const started = Date.now();
+  const promise = waitWithSignal(30_000, controller.signal);
+  setTimeout(() => controller.abort(reason), 10);
+  await assert.rejects(promise, error => error === reason);
+  assert.ok(Date.now() - started < 1_000);
+
+  // Already-aborted signal rejects synchronously without arming a timer.
+  await assert.rejects(waitWithSignal(30_000, controller.signal), error => error === reason);
+});
+
+test("429 retry backoff aborts immediately when the signal is aborted", async () => {
+  const originalFetch = globalThis.fetch;
+  const controller = new AbortController();
+  const reason = new Error("cancelled during backoff");
+  let calls = 0;
+  globalThis.fetch = (async () => {
+    calls++;
+    setTimeout(() => controller.abort(reason), 15);
+    return new Response("busy", { status: 429, headers: { "retry-after": "30" } });
+  }) as typeof fetch;
+  try {
+    const started = Date.now();
+    await assert.rejects(
+      importLatestActivities("valid-key", async () => ({ kind: "skipped", message: "unused" }), () => {}, controller.signal),
+      error => error === reason,
+    );
+    assert.equal(calls, 1);
+    assert.ok(Date.now() - started < 1_000);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

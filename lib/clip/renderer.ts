@@ -1,6 +1,6 @@
 import { createPlaybackRoute, playbackLocation, routeCoordinate, type PlaybackRoute } from "./playback";
 import { chronologicalTrailSlices } from "./trail-order";
-import { NO_DATA_COLOR, NO_DATA_INDEX, colorScheme, type ColorLegend, type ColorMode } from "./track-colors";
+import { NO_DATA_COLOR, NO_DATA_INDEX, colorScheme, type ColorLegend, type ColorMode, type ColorScheme } from "./track-colors";
 import { glowOpacityMultiplier, type MapTheme } from "./map-theme";
 import { formatRideElapsed } from "../format";
 import { riderAppearance, trackDurationsMs, trackProgress } from "./timing";
@@ -49,7 +49,7 @@ export type ClipScene = {
   palette: string[]; legend: ColorLegend | null; pixelRoutes: Map<string, PixelRoute[]>;
 };
 
-export function createScene(tracks: Track[], clipMs: number, colorMode: ColorMode): ClipScene {
+export function createScene(tracks: Track[], clipMs: number, color: ColorMode | ColorScheme): ClipScene {
   const durations = trackDurationsMs(tracks, clipMs);
   const scene: ClipScene = {
     clipMs,
@@ -60,19 +60,23 @@ export function createScene(tracks: Track[], clipMs: number, colorMode: ColorMod
     legend: null,
     pixelRoutes: new Map(),
   };
-  recolorScene(scene, tracks, colorMode);
+  recolorScene(scene, tracks, color);
   return scene;
 }
 
-/** Applies a colour mode to an existing scene (no routes are rebuilt). */
-export function recolorScene(scene: ClipScene, tracks: Track[], colorMode: ColorMode) {
-  const scheme = colorScheme(tracks, colorMode);
+/** Applies a precomputed colour scheme to an existing scene (no routes are rebuilt). */
+export function applyColorScheme(scene: ClipScene, scheme: ColorScheme) {
   scene.riders.forEach((rider, index) => {
     rider.color = scheme.rideColors[index];
     rider.pointColors = scheme.pointColors[index];
   });
   scene.palette = scheme.palette;
   scene.legend = scheme.legend;
+}
+
+/** Applies a colour mode or precomputed scheme to an existing scene (no routes are rebuilt). */
+export function recolorScene(scene: ClipScene, tracks: Track[], color: ColorMode | ColorScheme) {
+  applyColorScheme(scene, typeof color === "string" ? colorScheme(tracks, color) : color);
 }
 
 const paletteColor = (scene: ClipScene, index: number) => index === NO_DATA_INDEX ? NO_DATA_COLOR : scene.palette[index];

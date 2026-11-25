@@ -123,3 +123,19 @@ test("missing power stays unknown and does not drag the 30-second average down",
   const noTimes = rollingPower(Array.from({ length: 40 }, (_, i) => i < 10 ? 0 : 100), Array(40).fill(null));
   assert.equal(noTimes[39], 100);
 });
+
+test("rollingPower interpolates missing timestamps instead of mixing epoch ms with sample indices", () => {
+  const base = Date.parse("2026-09-15T08:00:00Z");
+  // Leading, interior and trailing missing timestamps mixed with real epoch ms.
+  const times: (number | null)[] = [null, base + 1_000, null, base + 3_000, null];
+  const powers: (number | null)[] = [100, 200, 300, 400, 500];
+  const result = rollingPower(powers, times);
+  // All 5 points span 4 seconds (< 30 s window), so none should be prematurely evicted.
+  assert.deepEqual(Array.from(result), [100, 150, 200, 250, 300]);
+
+  // Verify the 30 s window still evicts samples once >= 30 s have elapsed with gaps.
+  const longTimes: (number | null)[] = Array.from({ length: 40 }, (_, i) => (i === 5 || i === 25 ? null : base + i * 1000));
+  const longPowers: (number | null)[] = Array.from({ length: 40 }, (_, i) => (i < 20 ? 100 : 300));
+  const longResult = rollingPower(longPowers, longTimes);
+  assert.ok(Math.abs(longResult[39] - (10 * 100 + 20 * 300) / 30) < 1e-3);
+});

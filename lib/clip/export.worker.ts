@@ -68,5 +68,7 @@ self.onmessage = async (event: MessageEvent<RenderRequest>) => {
     post({ type: "done", buffer }, [buffer]);
   } catch (error) {
     post({ type: "error", message: error instanceof Error ? error.message : "The video could not be created. Please try again." });
+  } finally {
+    event.data.background.close();
   }
 };

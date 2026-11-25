@@ -12,20 +12,58 @@ const SEMICIRCLES_TO_DEGREES = 180 / 2 ** 31;
 const POWER_WINDOW_MS = 30_000;
 
 /**
+ * Produces a consistent timeline in ms for rolling windows so missing timestamps
+ * never mix epoch ms with 0-based sample indices. Missing entries are linearly
+ * interpolated between valid neighbours, or extrapolated at 1 sample/s at the ends.
+ */
+function normalizeTimes(times: (number | null)[]): Float64Array {
+  const n = times.length;
+  const out = new Float64Array(n);
+  let firstValid = -1;
+  for (let i = 0; i < n; i++) {
+    if (times[i] !== null) { firstValid = i; break; }
+  }
+  if (firstValid === -1) {
+    for (let i = 0; i < n; i++) out[i] = i * 1000;
+    return out;
+  }
+  for (let i = 0; i < firstValid; i++) out[i] = times[firstValid]! - (firstValid - i) * 1000;
+  let prev = firstValid;
+  out[prev] = times[prev]!;
+  for (let i = firstValid + 1; i < n; i++) {
+    const t = times[i];
+    if (t === null) continue;
+    out[i] = t;
+    const span = i - prev;
+    if (span > 1) {
+      const prevTime = out[prev];
+      if (t >= prevTime) {
+        const step = (t - prevTime) / span;
+        for (let k = 1; k < span; k++) out[prev + k] = prevTime + step * k;
+      } else {
+        for (let k = 1; k < span; k++) out[prev + k] = prevTime + k * 1000;
+      }
+    }
+    prev = i;
+  }
+  for (let i = prev + 1; i < n; i++) out[i] = out[prev] + (i - prev) * 1000;
+  return out;
+}
+
+/**
  * Trailing 30-second average power at each point (the usual "30 s power").
  * Samples without power are left out of the average; no power at all gives NaN.
  */
 export function rollingPower(powers: (number | null)[], times: (number | null)[]): Float32Array {
   const result = new Float32Array(powers.length).fill(NaN);
-  // Without timestamps, assume one sample per second.
-  const at = (i: number) => times[i] ?? i * 1000;
+  const timeline = normalizeTimes(times);
   let start = 0;
   let sum = 0;
   let count = 0;
   for (let i = 0; i < powers.length; i++) {
     const power = powers[i];
     if (power !== null) { sum += power; count++; }
-    while (at(i) - at(start) >= POWER_WINDOW_MS) {
+    while (start < i && timeline[i] - timeline[start] >= POWER_WINDOW_MS) {
       const old = powers[start++];
       if (old !== null) { sum -= old; count--; }
     }

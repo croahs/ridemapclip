@@ -102,8 +102,9 @@ export default function App() {
   }, [tracks]);
 
   const clipDurations = trackDurationsMs(tracks, clipSeconds * 1000);
-  // Per-point modes scan every GPS point, so compute once per change.
-  const { rideColors: colors, missing } = useMemo(() => colorScheme(tracks, colorMode), [tracks, colorMode]);
+  // Per-point modes scan every GPS point, so compute once per change and share with the map preview.
+  const scheme = useMemo(() => colorScheme(tracks, colorMode), [tracks, colorMode]);
+  const { rideColors: colors, missing } = scheme;
   const missingNote = missing ? `${missing} ride${missing === 1 ? " has" : "s have"} ${COLOR_MODES[colorMode].missing} and ${missing === 1 ? "is" : "are"} shown in grey.` : "";
   const totalFileMb = Math.round(files.reduce((sum, f) => sum + f.size, 0) / (1024 * 1024));
 
@@ -114,7 +115,7 @@ export default function App() {
     {!!tracks.length && <section ref={latestStep} className={styles.trackSection} aria-labelledby="track-title">
       <h2 id="track-title">Your tracks</h2>
       <p className={styles.success} role="status">{tracks.length.toLocaleString()} track(s) created — {tracks.reduce((sum, track) => sum + track.path.latitudes.length, 0).toLocaleString()} GPS points.</p>
-      <Suspense fallback={<p className={styles.mapLoading} role="status">Loading your map…</p>}><TrackMap tracks={tracks} colors={colors} clipSeconds={clipSeconds} onClipSecondsChange={setClipSeconds} colorMode={colorMode} onColorModeChange={setColorMode} colorNote={missingNote} /></Suspense>
+      <Suspense fallback={<p className={styles.mapLoading} role="status">Loading your map…</p>}><TrackMap tracks={tracks} colorScheme={scheme} clipSeconds={clipSeconds} onClipSecondsChange={setClipSeconds} colorMode={colorMode} onColorModeChange={setColorMode} colorNote={missingNote} /></Suspense>
       <ul className={styles.trackCards} aria-label="Track legend and ride summaries">{tracks.map((track, index) => <li key={`${track.name}-${index}`} className={styles.trackCard} style={{ "--track-color": colors[index] } as CSSProperties}>
         <h3>{index + 1}. {track.name}</h3>
         <p>GPS distance: {(track.distanceMeters / 1000).toLocaleString(undefined, {maximumFractionDigits: 2})} km · Moving time: {formatHumanDuration(track.movingSeconds)} · {track.path.latitudes.length.toLocaleString()} GPS points · Finishes at {(clipDurations[index] / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 })}s in the clip</p>

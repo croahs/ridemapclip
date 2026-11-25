@@ -57,25 +57,35 @@ export async function renderVideo(map: L.Map, tracks: Track[], clipMs: number, c
   const { width, height } = VIDEO_FORMATS[format];
   progress({ fraction: 0, message: "Preparing your map…" });
   const { background, view, frame } = await capture(map, theme, width, height, signal);
+  if (signal.aborted) {
+    background.close();
+    throw signal.reason;
+  }
   const worker = new Worker(new URL("./export.worker.ts", import.meta.url), { type: "module" });
+  let cleanupAbort: (() => void) | undefined;
   try {
     return await new Promise<Blob>((resolve, reject) => {
       const abort = () => reject(signal.reason);
+      cleanupAbort = () => signal.removeEventListener("abort", abort);
       signal.addEventListener("abort", abort, { once: true });
       worker.onmessage = (event: MessageEvent<RenderMessage>) => {
         const message = event.data;
         if (message.type === "progress") progress(message);
         else {
-          signal.removeEventListener("abort", abort);
+          cleanupAbort?.();
           if (message.type === "done") resolve(new Blob([message.buffer], { type: "video/mp4" }));
           else reject(new Error(message.message));
         }
       };
-      worker.onerror = () => reject(new Error("The video renderer stopped unexpectedly. Please try again."));
+      worker.onerror = () => {
+        cleanupAbort?.();
+        reject(new Error("The video renderer stopped unexpectedly. Please try again."));
+      };
       const request: RenderRequest = { tracks, clipMs, colorMode, theme, width, height, background, view, frame };
       worker.postMessage(request, [background]);
     });
   } finally {
+    cleanupAbort?.();
     worker.terminate();
   }
 }

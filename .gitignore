@@ -43,3 +43,6 @@ yarn-error.log*
 
 #  My notes
 vibenotesridemapclip.txt
+
+# Claude Code local settings
+.claude/

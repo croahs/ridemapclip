@@ -76,12 +76,27 @@ export function validApiKey(apiKey: string): boolean {
   return /^[\x21-\x7e]{1,256}$/.test(apiKey);
 }
 
+export function waitWithSignal(ms: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) return Promise.reject(signal.reason);
+  return new Promise((resolve, reject) => {
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(signal!.reason);
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
 async function fetchIntervals(url: string, authorization: string, signal?: AbortSignal): Promise<Response> {
   for (let attempt = 0; ; attempt++) {
     const response = await fetch(url, { headers: { Authorization: authorization }, cache: "no-store", signal });
     if (response.status !== 429 || attempt === 2) return response;
     await response.body?.cancel();
-    await new Promise(resolve => setTimeout(resolve, retryAfterMs(response.headers.get("retry-after"))));
+    await waitWithSignal(retryAfterMs(response.headers.get("retry-after")), signal);
   }
 }
 

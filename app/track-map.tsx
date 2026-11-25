@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { trackDurationsMs } from "@/lib/clip/timing";
 import type { MapTheme } from "@/lib/clip/map-theme";
-import type { ColorMode } from "@/lib/clip/track-colors";
+import type { ColorMode, ColorScheme } from "@/lib/clip/track-colors";
 import { VIDEO_FORMATS, type VideoFormat } from "@/lib/clip/video-format";
 import type { Track } from "@/lib/track";
 import VideoExport from "./video-export";
@@ -11,14 +11,14 @@ import { useClipPreview } from "./use-clip-preview";
 import styles from "./app.module.css";
 
 type Props = {
-  tracks: Track[]; colors: string[];
+  tracks: Track[]; colorScheme: ColorScheme;
   clipSeconds: number; onClipSecondsChange: (seconds: number) => void;
   colorMode: ColorMode; onColorModeChange: (mode: ColorMode) => void;
   /** Explains rides shown in grey because they lack data for the colour mode. */
   colorNote: string;
 };
 
-export default function TrackMap({ tracks, colors, clipSeconds, onClipSecondsChange, colorMode, onColorModeChange, colorNote }: Props) {
+export default function TrackMap({ tracks, colorScheme, clipSeconds, onClipSecondsChange, colorMode, onColorModeChange, colorNote }: Props) {
   const clipMs = clipSeconds * 1000;
   const [rendering, setRendering] = useState(false);
   const [mapTheme, setMapTheme] = useState<MapTheme>("dark");
@@ -27,7 +27,7 @@ export default function TrackMap({ tracks, colors, clipSeconds, onClipSecondsCha
   const [fullscreen, setFullscreen] = useState(false);
   const [fullscreenError, setFullscreenError] = useState("");
   const durations = useMemo(() => trackDurationsMs(tracks, clipMs), [tracks, clipMs]);
-  const { container, mapRef, controls, status, elapsed, tileError, recenter } = useClipPreview({ tracks, clipMs, colorMode, mapTheme, videoFormat });
+  const { container, mapRef, controls, status, elapsed, tileError, recenter } = useClipPreview({ tracks, clipMs, colorScheme, mapTheme, videoFormat });
 
   const [controlsVisible, setControlsVisible] = useState(true);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -86,7 +86,7 @@ export default function TrackMap({ tracks, colors, clipSeconds, onClipSecondsCha
       onClick={onUserActivity}
     >
       <VideoExport tracks={tracks} clipMs={clipMs} colorMode={colorMode} mapTheme={mapTheme} videoFormat={videoFormat} getMap={() => mapRef.current} pausePreview={() => controls.current?.pause()} onBusy={setRendering} />
-      <PlaybackPanel tracks={tracks} colors={colors} durations={durations} clipSeconds={clipSeconds} status={status} elapsed={elapsed} rendering={rendering} fullscreen={fullscreen}
+      <PlaybackPanel tracks={tracks} colors={colorScheme.rideColors} durations={durations} clipSeconds={clipSeconds} status={status} elapsed={elapsed} rendering={rendering} fullscreen={fullscreen}
         onPlay={() => controls.current?.play()} onPause={() => controls.current?.pause()} onRestart={() => controls.current?.replay()} onFullscreen={toggleFullscreen} />
       {fullscreenError && <p className={styles.error} role="alert">{fullscreenError}</p>}
       {tracks.some((track) => !track.movingSeconds || track.movingSeconds <= 0) && <p className={styles.hint}>Rides without a moving time use the full clip length.</p>}

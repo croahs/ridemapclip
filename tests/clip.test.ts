@@ -5,6 +5,10 @@ import {
   trackDurationsMs, trackProgress, videoFrameCount, videoFrameTiming,
 } from "../lib/clip/timing";
 import { VIDEO_FORMATS } from "../lib/clip/video-format";
+import { riderTooltipContent } from "../lib/clip/tooltip";
+import { createScene, applyColorScheme } from "../lib/clip/renderer";
+import { colorScheme } from "../lib/clip/track-colors";
+import type { Track } from "../lib/track";
 
 test("clip length is chosen between 15 and 120 seconds, 30 by default", () => {
   assert.deepEqual(CLIP_SECONDS, { min: 15, max: 120, default: 30 });
@@ -84,4 +88,58 @@ test("each rider dot stops at its own finish while its glow fades for one second
   assert.deepEqual(riderAppearance(30000, 30000, 30000), { visible: false, glowOpacity: 0 });
   assert.deepEqual(riderAppearance(60000, 60000, 60000), { visible: false, glowOpacity: 0 });
   assert.deepEqual(riderAppearance(0, 15000, 30000), { visible: true, glowOpacity: 1 });
+});
+
+test("riderTooltipContent builds a span with plain textContent and never assigns innerHTML", () => {
+  const created: { tag: string; textContent: string | null; innerHTMLAssigned: boolean }[] = [];
+  const doc = {
+    createElement(tag: string) {
+      const record = { tag, textContent: null as string | null, innerHTMLAssigned: false };
+      created.push(record);
+      return {
+        get textContent() { return record.textContent; },
+        set textContent(value: string | null) { record.textContent = value; },
+        set innerHTML(_value: string) { record.innerHTMLAssigned = true; throw new Error("innerHTML must not be used"); },
+      } as unknown as HTMLSpanElement;
+    },
+  };
+  const payload = '<img src=x onerror="alert(1)">';
+  const span = riderTooltipContent(0, payload, doc);
+  assert.equal(created.length, 1);
+  assert.equal(created[0].tag, "span");
+  assert.equal(span.textContent, `1. ${payload}`);
+  assert.equal(created[0].innerHTMLAssigned, false);
+});
+
+test("createScene and applyColorScheme reuse a precomputed ColorScheme", () => {
+  const track: Track = {
+    name: "Ride",
+    movingSeconds: 100,
+    distanceMeters: 1000,
+    skippedRecords: 0,
+    warnings: [],
+    elapsedSeconds: 100,
+    startedAt: "2026-09-15T08:00:00Z",
+    endedAt: "2026-09-15T08:01:40Z",
+    path: {
+      latitudes: Float64Array.from([48.85, 48.86]),
+      longitudes: Float64Array.from([2.35, 2.36]),
+      breaks: Uint8Array.from([0, 0]),
+      elevations: Float32Array.from([100, 200]),
+      speeds: Float32Array.from([5, 10]),
+      power30: Float32Array.from([150, 250]),
+      heartRates: Float32Array.from([120, 160]),
+    },
+  };
+  const elevScheme = colorScheme([track], "elevation");
+  const scene = createScene([track], 30_000, elevScheme);
+  assert.equal(scene.riders[0].color, elevScheme.rideColors[0]);
+  assert.equal(scene.riders[0].pointColors, elevScheme.pointColors[0]);
+  assert.deepEqual(scene.legend, elevScheme.legend);
+
+  const rideScheme = colorScheme([track], "ride");
+  applyColorScheme(scene, rideScheme);
+  assert.equal(scene.riders[0].color, rideScheme.rideColors[0]);
+  assert.equal(scene.riders[0].pointColors, null);
+  assert.equal(scene.legend, null);
 });
